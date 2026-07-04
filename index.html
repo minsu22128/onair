@@ -788,6 +788,7 @@ const demo = {
   async listRooms(ownerOnly){
     const db = this.load();
     const rooms = Object.values(db.rooms || {});
+    if(!rooms.length) return [];
     if(ownerOnly){
       const saved = JSON.parse(localStorage.getItem("praise_my_rooms") || "[]");
       return rooms.filter(r => saved.includes(r.id));
@@ -883,12 +884,12 @@ const demo = {
    ============================================================ */
 const cloud = {
   // 비회원도 실시간 참여는 가능해야 하므로, 로그인 안 했으면 익명 세션 유지
-  async ensureAuth(){
+  async ensureAuth(silent){
     const { data } = await sb.auth.getSession();
     if(data.session) return true;
     const { error } = await sb.auth.signInAnonymously();
     if(error){
-      alert("연결에 실패했어요.\n\nSupabase 대시보드에서\nAuthentication → Providers → Anonymous 를 켜주세요.\n\n(" + error.message + ")");
+      if(!silent) alert("연결에 실패했어요.\n\nSupabase 대시보드에서\nAuthentication → Providers → Anonymous 를 켜주세요.\n\n(" + error.message + ")");
       return false;
     }
     return true;
@@ -898,14 +899,17 @@ const cloud = {
     return data.user ? data.user.id : null;
   },
   async listRooms(ownerOnly){
-    if(!await this.ensureAuth()) return [];
-    let q = sb.from("praise_rooms").select("id,code,name,has_password,owner,current_song,current_page,presets,created_at,pw_hash").order("created_at", { ascending:false }).limit(50);
+    await this.ensureAuth(true);   // 비회원도 익명 세션으로 조회, 실패해도 조용히
+    let q = sb.from("praise_rooms")
+      .select("id,code,name,has_password,owner,current_song,current_page,presets,created_at,pw_hash")
+      .order("created_at", { ascending:false }).limit(50);
     if(ownerOnly){
       const uid = await this.currentUid();
       if(!uid) return [];
       q = q.eq("owner", uid);
     }
-    const { data } = await q;
+    const { data, error } = await q;
+    if(error){ console.warn("listRooms error:", error.message); return []; }
     return data || [];
   },
   async createRoom(name, _code, password){
@@ -1303,10 +1307,16 @@ $("rp-role-accomp").onclick = ()=>setRole("accomp");
 async function loadRoomsList(){
   const box = $("rooms-list");
   box.innerHTML = `<div class="rooms-empty">불러오는 중...</div>`;
-  const rooms = await api.listRooms(roomsTab === "mine");
+  let rooms;
+  try{
+    rooms = await api.listRooms(roomsTab === "mine");
+  }catch(e){
+    box.innerHTML = `<div class="rooms-empty">방 목록을 불러오지 못했어요.<br/><button class="btn" style="margin-top:10px" onclick="loadRoomsList()">다시 시도</button></div>`;
+    return;
+  }
   box.innerHTML = "";
   if(!rooms.length){
-    box.innerHTML = `<div class="rooms-empty">${roomsTab==="mine" ? "내가 만든 방이 없어요.<br/>＋ 방 만들기로 새 방을 열어보세요." : "아직 방이 없어요."}</div>`;
+    box.innerHTML = `<div class="rooms-empty">${roomsTab==="mine" ? "내가 만든 방이 없어요.<br/>＋ 방 만들기로 새 방을 열어보세요." : "아직 방이 없어요.<br/>＋ 방 만들기로 새 방을 열어보세요."}</div>`;
     return;
   }
   const uid = currentUser() ? currentUser().nickname : null;
@@ -2239,4 +2249,37 @@ applyFontPt();
 $("btn-font").onclick = ()=>$("modal-font").classList.remove("hidden");
 $("btn-font-close").onclick = ()=>$("modal-font").classList.add("hidden");
 $("btn-pt-up").onclick = ()=>{ fontPt += 1; applyFontPt(); };
-$("btn-pt-down").onclick = ()=>{ fontPt -= 1; applyFon
+$("btn-pt-down").onclick = ()=>{ fontPt -= 1; applyFontPt(); };
+
+/* ---------------- 공유 / 설정 ---------------- */
+$("btn-share").onclick = async ()=>{
+  if(MODE === "demo"){
+    toast("로컬 모드에서는 같은 브라우저의 다른 탭에서 코드 " + state.room.code + "로 입장할 수 있어요");
+    return;
+  }
+  const url = `${location.origin}${location.pathname}?code=${state.room.code}`;
+  const text = `[${state.room.name}] 라이브 악보 입장\n코드: ${state.room.code}\n${url}`;
+  if(navigator.share){
+    navigator.share({ title:"라이브 악보", text, url }).catch(()=>{});
+  }else{
+    await navigator.clipboard.writeText(text);
+    toast("입장 링크를 복사했어요");
+  }
+};
+
+$("btn-settings").onclick = ()=>{
+  $("preset-text").value = (state.room.presets || DEFAULT_PRESETS).join("\n");
+  $("modal-settings").classList.remove("hidden");
+};
+$("btn-settings-cancel").onclick = ()=>$("modal-settings").classList.add("hidden");
+$("btn-save-presets").onclick = async ()=>{
+  const presets = $("preset-text").value.split("\n").map(s=>s.trim()).filter(Boolean).slice(0, 12);
+  await api.updateRoom(state.room.id, { presets });
+  state.room.presets = presets;
+  buildChips();
+  $("modal-settings").classList.add("hidden");
+  toast("메시지 버튼을 저장했어요");
+};
+</script>
+</body>
+</html>
