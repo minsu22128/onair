@@ -378,7 +378,13 @@
     border:1px solid rgba(232,176,75,.3);
   }
   .rc-badge.lock{ background:rgba(255,255,255,.06); color:var(--dim); border-color:var(--line); }
-  .rooms-empty{ color:var(--dim); font-size:14px; text-align:center; padding:40px 0; line-height:1.8; }
+  .rc-actions{ flex:none; display:flex; flex-direction:column; gap:6px; }
+  .rc-btn{
+    border-radius:8px; padding:7px 12px; font-size:13px; font-weight:700;
+    cursor:pointer; border:1px solid var(--line); background:var(--panel-2); color:var(--ink);
+  }
+  .rc-btn.enter{ background:var(--accent); color:#1c1608; border-color:var(--accent-deep); }
+  .rc-btn.del{ color:var(--danger); }
 
   /* ---------- 방 만들기/입장 패널 ---------- */
   .panel-toggle{
@@ -1283,7 +1289,26 @@ async function loadRoomsList(){
           ${room.has_password ? '<span class="rc-badge lock">🔒 비번 있음</span>' : '<span class="rc-badge">🔓 자유 입장</span>'}
           ${isMine ? '<span class="rc-badge">내 방</span>' : ""}
         </div>
+      </div>
+      <div class="rc-actions" onclick="event.stopPropagation()">
+        <button class="rc-btn enter">입장</button>
+        ${isMine ? '<button class="rc-btn del">삭제</button>' : ""}
       </div>`;
+    card.querySelector(".rc-btn.enter").onclick = (e)=>{ e.stopPropagation(); tryEnterRoom(room); };
+    if(isMine){
+      card.querySelector(".rc-btn.del").onclick = async (e)=>{
+        e.stopPropagation();
+        const btn = e.currentTarget;
+        if(btn.dataset.armed !== "1"){
+          btn.dataset.armed = "1"; btn.textContent = "확인?";
+          setTimeout(()=>{ btn.dataset.armed=""; btn.textContent="삭제"; }, 2500);
+          return;
+        }
+        await api.adminDeleteRoom(room.id);
+        card.remove();
+        toast(`'${room.name}' 방을 삭제했어요`);
+      };
+    }
     card.onclick = ()=>tryEnterRoom(room);
     box.appendChild(card);
   });
