@@ -732,7 +732,7 @@
    ============================================================ */
 const SUPABASE_URL = "";
 const SUPABASE_ANON_KEY = "";
-const ADMIN_PIN = "4695";
+const ADMIN_PIN = "0000";
 
 const CONFIGURED = /supabase\.co/.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 30;
 const MODE = CONFIGURED ? "cloud" : "demo";
@@ -885,14 +885,16 @@ const demo = {
 const cloud = {
   // 비회원도 실시간 참여는 가능해야 하므로, 로그인 안 했으면 익명 세션 유지
   async ensureAuth(silent){
-    const { data } = await sb.auth.getSession();
-    if(data.session) return true;
-    const { error } = await sb.auth.signInAnonymously();
-    if(error){
-      if(!silent) alert("연결에 실패했어요.\n\nSupabase 대시보드에서\nAuthentication → Providers → Anonymous 를 켜주세요.\n\n(" + error.message + ")");
-      return false;
-    }
-    return true;
+    try{
+      const { data } = await sb.auth.getSession();
+      if(data.session) return true;
+      const { error } = await sb.auth.signInAnonymously();
+      if(error){
+        if(!silent) toast("서버 연결 실패: " + error.message);
+        return false;
+      }
+      return true;
+    }catch(e){ return false; }
   },
   async currentUid(){
     const { data } = await sb.auth.getUser();
@@ -909,7 +911,7 @@ const cloud = {
       q = q.eq("owner", uid);
     }
     const { data, error } = await q;
-    if(error){ console.warn("listRooms error:", error.message); return []; }
+    if(error){ console.warn("listRooms:", error.message); throw error; }
     return data || [];
   },
   async createRoom(name, _code, password){
@@ -931,11 +933,18 @@ const cloud = {
     return data;
   },
   async findRoom(code){
-    if(!await this.ensureAuth()) return null;
-    const { data } = await sb.from("praise_rooms").select().eq("code", code.toUpperCase()).maybeSingle();
-    return data;
+    await this.ensureAuth(true);
+    try{
+      const { data, error } = await sb.from("praise_rooms")
+        .select().eq("code", code.toUpperCase().trim()).maybeSingle();
+      if(error) throw error;
+      return data;
+    }catch(e){ toast("방 조회 실패: " + e.message); return null; }
   },
-  async updateRoomSettings(id, patch){ await sb.from("praise_rooms").update(patch).eq("id", id); },
+  async updateRoom(id, patch){
+    try{ await sb.from("praise_rooms").update(patch).eq("id", id); }catch(e){}
+  },
+  async updateRoomSettings(id, patch){ await this.updateRoom(id, patch); },
   async listSongs(roomId){
     const { data } = await sb.from("praise_songs").select()
       .eq("room_id", roomId).order("sort").order("created_at");
