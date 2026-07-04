@@ -516,6 +516,7 @@
       <button class="icon-btn" id="btn-setlist">콘티</button>
       <button class="icon-btn" id="btn-draw">✏️ 그리기</button>
       <button class="icon-btn" id="btn-solo">⭐ 솔로</button>
+      <button class="icon-btn" id="btn-textbox">✍ 텍스트</button>
       <button class="icon-btn" id="btn-undo">↩ 되돌리기</button>
       <button class="icon-btn" id="btn-erase">지우기</button>
       <button class="icon-btn" id="btn-note">📝 멘트</button>
@@ -538,13 +539,25 @@
 
 <!-- 곡 추가 모달 -->
 <div class="modal-veil hidden" id="modal-add">
-  <div class="modal">
-    <h3>곡 추가</h3>
-    <input id="add-title" class="field" placeholder="곡 제목" maxlength="40" />
-    <input id="add-files" class="field" type="file" accept="image/*,.pdf,application/pdf" multiple />
-    <p class="note">악보 <b>사진/이미지 또는 PDF</b>를 선택하세요. PDF는 페이지별로 자동 변환되고, 이미지는 페이지 순서대로 올라갑니다. 용량도 자동으로 줄여줘요.</p>
-    <button class="btn primary" id="btn-upload">올리기</button>
-    <button class="btn ghost" id="btn-add-cancel">취소</button>
+  <div class="modal" style="max-width:480px;max-height:85dvh;overflow-y:auto">
+    <h3>악보 추가</h3>
+
+    <!-- 1단계: 파일 선택 -->
+    <div id="add-step1">
+      <p class="note">악보 사진·이미지 또는 <b>전체 콘티 PDF</b>를 선택하세요.</p>
+      <input id="add-files" class="field" type="file" accept="image/*,.pdf,application/pdf" multiple />
+      <button class="btn primary" id="btn-add-preview">다음 ▶</button>
+      <button class="btn ghost" id="btn-add-cancel">취소</button>
+    </div>
+
+    <!-- 2단계: 곡 분할 설정 -->
+    <div id="add-step2" class="hidden">
+      <p class="note" id="add-page-info"></p>
+      <div id="add-songs-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px"></div>
+      <button class="btn" id="btn-add-song-row" style="font-size:14px">＋ 곡 추가</button>
+      <button class="btn primary" id="btn-upload" style="margin-top:8px">올리기</button>
+      <button class="btn ghost" id="btn-add-back">← 뒤로</button>
+    </div>
   </div>
 </div>
 
@@ -737,6 +750,26 @@
     <button class="btn ghost" id="btn-rs-cancel">취소</button>
   </div>
 </div>
+<!-- 텍스트 박스 모달 -->
+<div class="modal-veil hidden" id="modal-textbox">
+  <div class="modal">
+    <h3>✍ 악보 위 텍스트</h3>
+    <input id="tb-text" class="field" placeholder="악보 위에 표시할 텍스트" maxlength="50" />
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+      <div style="flex:1;min-width:120px">
+        <p class="note">글자 크기</p>
+        <div class="size-row" id="tb-sizes"></div>
+      </div>
+      <div style="flex:1;min-width:120px">
+        <p class="note">색상</p>
+        <div class="swatch-row" id="tb-colors"></div>
+      </div>
+    </div>
+    <button class="btn primary" id="btn-tb-place">악보에 배치하기</button>
+    <button class="btn ghost" id="btn-tb-cancel">취소</button>
+  </div>
+</div>
+
 <div id="blackout">
   <div class="bo-clock" id="bo-clock">--:--</div>
   <div class="bo-title" id="bo-title">잠시 준비 중입니다</div>
@@ -754,7 +787,7 @@
    ============================================================ */
 const SUPABASE_URL = "https://dgjotupusjfunwatxatw.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRnam90dXB1c2pmdW53YXR4YXR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxNDUyMDcsImV4cCI6MjA5ODcyMTIwN30.gkIz1ZygkEyqADa_YFAlOZ5hAfvTSb5MeWM77ydNpko";
-const ADMIN_PIN = "4695";
+const ADMIN_PIN = "0000";
 
 const CONFIGURED = /supabase\.co/.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 30;
 const MODE = CONFIGURED ? "cloud" : "demo";
@@ -779,8 +812,9 @@ function toast(msg){
   t._tm = setTimeout(()=>t.classList.remove("show"), Math.max(2400, msg.length * 75));
 }
 function getAnn(key){
-  if(!state.ann[key]) state.ann[key] = { strokes:[], badges:[], order:[] };
+  if(!state.ann[key]) state.ann[key] = { strokes:[], badges:[], order:[], textboxes:[] };
   if(!state.ann[key].order) state.ann[key].order = [];
+  if(!state.ann[key].textboxes) state.ann[key].textboxes = [];
   return state.ann[key];
 }
 function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : "id-" + Math.random().toString(36).slice(2)); }
@@ -1507,7 +1541,167 @@ function doEnterRoom(room, role){
   enterRoom(room, role);
 }
 
-/* ---------------------------------------------------------------- */
+/* ================================================================
+   PDF 분할 등록
+   ================================================================ */
+let addPdfPages = [];   // 변환된 페이지 blob 배열
+
+$("btn-add-song").onclick = ()=>{
+  $("add-files").value = "";
+  addPdfPages = [];
+  $("add-step1").classList.remove("hidden");
+  $("add-step2").classList.add("hidden");
+  $("modal-add").classList.remove("hidden");
+};
+$("btn-add-cancel").onclick = ()=>$("modal-add").classList.add("hidden");
+$("btn-add-back").onclick   = ()=>{ $("add-step1").classList.remove("hidden"); $("add-step2").classList.add("hidden"); };
+
+$("btn-add-preview").onclick = async ()=>{
+  const files = [...$("add-files").files];
+  if(!files.length) return toast("파일을 선택해주세요");
+  const btn = $("btn-add-preview"); btn.disabled = true; btn.textContent = "변환 중...";
+  addPdfPages = [];
+  try{
+    const maxDim = MODE === "demo" ? 1100 : 1600;
+    const quality = MODE === "demo" ? 0.7 : 0.82;
+    for(const file of files){
+      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+      if(isPdf){
+        const pages = await pdfToBlobs(file, maxDim, quality, (p,t)=>{ btn.textContent = `변환 중... (${p}/${t})`; });
+        addPdfPages.push(...pages);
+      }else{
+        addPdfPages.push(await resizeImage(file, maxDim, quality));
+      }
+    }
+  }catch(e){ toast("변환 실패: " + e.message); btn.disabled=false; btn.textContent="다음 ▶"; return; }
+  btn.disabled=false; btn.textContent="다음 ▶";
+  buildAddSongRows();
+  $("add-page-info").textContent = `총 ${addPdfPages.length}쪽이 로드됐습니다. 곡별로 범위를 지정하세요.`;
+  $("add-step1").classList.add("hidden");
+  $("add-step2").classList.remove("hidden");
+};
+
+function buildAddSongRows(){
+  const list = $("add-songs-list");
+  list.innerHTML = "";
+  // 기본: 전체 페이지를 1곡으로
+  addSongRow(list, 1, addPdfPages.length);
+}
+
+function addSongRow(list, from, to){
+  const row = document.createElement("div");
+  row.style.cssText = "background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px";
+  row.innerHTML = `
+    <input class="field sr-title" placeholder="곡 제목" maxlength="40" style="font-size:15px" />
+    <input class="field sr-note" placeholder="멘트 (예: G키, 빠르게)" maxlength="100" style="font-size:14px" />
+    <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--dim)">
+      <span>${addPdfPages.length}쪽 중</span>
+      <input class="field sr-from" type="number" min="1" max="${addPdfPages.length}" value="${from}" style="width:64px;padding:8px;font-size:15px;text-align:center" />
+      <span>~</span>
+      <input class="field sr-to" type="number" min="1" max="${addPdfPages.length}" value="${to}" style="width:64px;padding:8px;font-size:15px;text-align:center" />
+      <span>쪽</span>
+      <button class="mini" style="color:var(--danger);margin-left:auto" onclick="this.closest('div').parentElement.remove()">삭제</button>
+    </div>`;
+  list.appendChild(row);
+}
+
+$("btn-add-song-row").onclick = ()=>{
+  const rows = $("add-songs-list").children;
+  const lastTo = rows.length ? parseInt(rows[rows.length-1].querySelector(".sr-to").value)||1 : 0;
+  addSongRow($("add-songs-list"), Math.min(lastTo+1, addPdfPages.length), addPdfPages.length);
+};
+
+$("btn-upload").onclick = async ()=>{
+  const rows = [...$("add-songs-list").children];
+  if(!rows.length) return toast("곡을 하나 이상 추가하세요");
+  const songs = rows.map(r=>({
+    title: r.querySelector(".sr-title").value.trim(),
+    note:  r.querySelector(".sr-note").value.trim(),
+    from:  parseInt(r.querySelector(".sr-from").value)||1,
+    to:    parseInt(r.querySelector(".sr-to").value)||1,
+  }));
+  if(songs.some(s=>!s.title)) return toast("모든 곡의 제목을 입력하세요");
+  if(songs.some(s=>s.from>s.to)) return toast("시작 쪽이 끝 쪽보다 클 수 없어요");
+
+  const btn = $("btn-upload"); btn.disabled=true; btn.textContent="올리는 중...";
+  try{
+    const maxSort = state.songs.reduce((m,s)=>Math.max(m,s.sort),-1);
+    for(let i=0; i<songs.length; i++){
+      const s = songs[i];
+      btn.textContent = `올리는 중... (${i+1}/${songs.length}곡)`;
+      const songId = uid();
+      const sliceBlobs = addPdfPages.slice(s.from-1, s.to);
+      const urls = [];
+      for(let p=0; p<sliceBlobs.length; p++){
+        urls.push(await api.uploadPage(state.room.id, songId, p, sliceBlobs[p]));
+      }
+      await api.insertSong({ id:songId, room_id:state.room.id, title:s.title, note:s.note, sort:maxSort+1+i, pages:urls });
+    }
+    await loadSongs(); render();
+    channel?.send("songs", {});
+    $("modal-add").classList.add("hidden");
+    addPdfPages = [];
+    toast(`${songs.length}곡 추가 완료`);
+  }catch(e){ toast("업로드 실패: "+e.message); }
+  finally{ btn.disabled=false; btn.textContent="올리기"; }
+};
+
+/* ================================================================
+   악보 위 텍스트 박스
+   ================================================================ */
+const TB_COLORS = ["#ffffff","#fbbf24","#f87171","#86efac","#93c5fd","#111111"];
+const TB_SIZES  = [{label:"작게", s:0.025}, {label:"보통", s:0.038}, {label:"크게", s:0.055}];
+let tbState = { c:"#fbbf24", s:0.038 };
+let pendingTb = null;   // { key, x, y }
+
+function buildTbModal(){
+  const cbox=$("tb-colors"); cbox.innerHTML="";
+  TB_COLORS.forEach(c=>{
+    const b=document.createElement("button");
+    b.className="swatch"+(tbState.c===c?" sel":"");
+    b.style.background=c; b.style.border="2px solid "+(c==="#ffffff"?"#888":c);
+    b.onclick=()=>{ tbState.c=c; buildTbModal(); };
+    cbox.appendChild(b);
+  });
+  const sbox=$("tb-sizes"); sbox.innerHTML="";
+  TB_SIZES.forEach(sz=>{
+    const b=document.createElement("button");
+    b.className="btn"+(tbState.s===sz.s?" sel":"");
+    b.textContent=sz.label; b.onclick=()=>{ tbState.s=sz.s; buildTbModal(); };
+    sbox.appendChild(b);
+  });
+}
+
+$("btn-textbox").onclick = ()=>{
+  buildTbModal();
+  $("tb-text").value="";
+  $("modal-textbox").classList.remove("hidden");
+  setTimeout(()=>$("tb-text").focus(),100);
+};
+$("btn-tb-cancel").onclick = ()=>{ $("modal-textbox").classList.add("hidden"); pendingTb=null; };
+$("btn-tb-place").onclick = ()=>{
+  const text=$("tb-text").value.trim();
+  if(!text) return toast("텍스트를 입력하세요");
+  $("modal-textbox").classList.add("hidden");
+  setTool("textbox");
+  toast("악보에서 텍스트를 놓을 위치를 탭하세요");
+};
+
+// 텍스트 박스는 캔버스 클릭 시 배치 (attachDrawing에서 처리)
+function placeTb(cv, x, y){
+  const text=$("tb-text").value.trim();
+  if(!text) return;
+  const key=cv.dataset.key;
+  const tb={x,y,text,c:tbState.c,s:tbState.s};
+  const a=getAnn(key);
+  if(!a.textboxes) a.textboxes=[];
+  a.textboxes.push(tb); a.order.push("t");
+  drawAnn(cv);
+  channel?.send("textbox",{key,tb});
+  setTool(null);
+}
+
+/* ================================================================ */
 
 /* ---------------- 방 입장 ---------------- */
 async function enterRoom(room, role){
@@ -1580,9 +1774,15 @@ function onEvent(event, payload){
       document.querySelectorAll(".pane canvas").forEach(drawAnn);
       break;
     case "songs": loadSongs().then(render); break;
-    case "badgeMove": {
+    case "textbox": {
       const a = getAnn(payload.key);
-      if(a.badges[payload.index]){ a.badges[payload.index].x = payload.x; a.badges[payload.index].y = payload.y; }
+      if(!a.textboxes) a.textboxes=[];
+      a.textboxes.push(payload.tb); a.order.push("t");
+      redrawIfVisible(payload.key); break;
+    }
+    case "badgeMove": {
+      const ab = getAnn(payload.key);
+      if(ab.badges[payload.index]){ ab.badges[payload.index].x = payload.x; ab.badges[payload.index].y = payload.y; }
       redrawIfVisible(payload.key); break;
     }
     case "blackout":
@@ -1769,6 +1969,18 @@ function drawAnn(cv){
     ctx.fillStyle = "#1c1608";
     ctx.fillText(label, x - tw/2, y);
   }
+  // 텍스트 박스
+  if(ann.textboxes){
+    for(const tb of ann.textboxes){
+      const fs = Math.max(12, w * tb.s);
+      ctx.font = `bold ${fs}px Pretendard, sans-serif`;
+      ctx.fillStyle = tb.c;
+      ctx.shadowColor = tb.c === "#ffffff" ? "rgba(0,0,0,0.8)" : "transparent";
+      ctx.shadowBlur = 4;
+      ctx.fillText(tb.text, tb.x*w, tb.y*h);
+      ctx.shadowBlur = 0;
+    }
+  }
 }
 function roundRect(ctx,x,y,w,h,r){
   ctx.beginPath();
@@ -1829,6 +2041,11 @@ function attachDrawing(cv){
       $("modal-solo").classList.remove("hidden");
       setTimeout(()=>$("solo-name").focus(), 100);
       setTool(null);
+      return;
+    }
+    if(state.tool === "textbox"){
+      const [x,y] = norm(e);
+      placeTb(cv, x, y);
       return;
     }
     if(state.tool === "draw"){
@@ -1908,6 +2125,7 @@ function setTool(t){
   state.tool = (state.tool === t) ? null : t;
   $("btn-draw").classList.toggle("on", state.tool === "draw");
   $("btn-solo").classList.toggle("on", state.tool === "solo");
+  $("btn-textbox").classList.toggle("on", state.tool === "textbox");
   if(state.tool === "solo") toast("악보에서 솔로 위치를 탭하세요");
   if(state.tool === "draw") toast("악보 위에 손가락/펜으로 그리세요");
 }
@@ -1924,7 +2142,8 @@ function undoKey(key){
   const last = a.order.pop();
   if(last === "b") a.badges.pop();
   else if(last === "s") a.strokes.pop();
-  else if(a.strokes.length) a.strokes.pop();   // 순서 기록 없는 옛 데이터 대비
+  else if(last === "t") { if(a.textboxes) a.textboxes.pop(); }
+  else if(a.strokes.length) a.strokes.pop();
   else if(a.badges.length) a.badges.pop();
   else return false;
   redrawIfVisible(key);
@@ -2084,63 +2303,7 @@ async function reorder(i, dir){
   channel?.send("songs", {});
 }
 
-/* ---------------- 곡 추가 (자동 리사이즈 업로드) ---------------- */
-$("btn-add-song").onclick = ()=>{ $("modal-add").classList.remove("hidden"); };
-$("btn-add-cancel").onclick = ()=>{ $("modal-add").classList.add("hidden"); };
-
-$("btn-upload").onclick = async ()=>{
-  const title = $("add-title").value.trim();
-  const files = [...$("add-files").files];
-  if(!title) return toast("곡 제목을 입력하세요");
-  if(!files.length) return toast("악보 이미지나 PDF를 선택하세요");
-  const btn = $("btn-upload");
-  btn.disabled = true; btn.textContent = "준비 중...";
-  try{
-    const songId = uid();
-    const maxDim = MODE === "demo" ? 1100 : 1600;   // 로컬 모드는 저장 공간 절약
-    const quality = MODE === "demo" ? 0.7 : 0.82;
-
-    // 1) 모든 파일을 페이지 이미지(blob) 목록으로 변환 (PDF는 페이지별로 풀어냄)
-    const blobs = [];
-    for(const file of files){
-      const kind = await sniffType(file);   // 확장자가 아니라 실제 파일 내용으로 판별
-      const isPdf = kind === "pdf" || file.type === "application/pdf" || /\.pdf$/i.test(file.name);
-      if(isPdf){
-        const pages = await pdfToBlobs(file, maxDim, quality, (p, total)=>{
-          btn.textContent = `PDF 변환 중... (${p}/${total}쪽)`;
-        });
-        blobs.push(...pages);
-      }else{
-        btn.textContent = "이미지 처리 중...";
-        blobs.push(await resizeImage(file, maxDim, quality));
-      }
-    }
-    if(!blobs.length) throw new Error("변환된 페이지가 없어요");
-    if(MODE === "demo" && blobs.length > 15){
-      toast("로컬 모드에서는 곡당 15쪽까지만 올라가요");
-      blobs.length = 15;
-    }
-
-    // 2) 순서대로 업로드
-    const urls = [];
-    for(let i = 0; i < blobs.length; i++){
-      btn.textContent = `올리는 중... (${i+1}/${blobs.length})`;
-      urls.push(await api.uploadPage(state.room.id, songId, i, blobs[i]));
-    }
-    const maxSort = state.songs.reduce((m,s)=>Math.max(m, s.sort), -1);
-    const ok = await api.insertSong({ id: songId, room_id: state.room.id, title, sort: maxSort+1, pages: urls });
-    if(ok === false) throw new Error("저장 실패");
-    await loadSongs(); render();
-    channel?.send("songs", {});
-    $("modal-add").classList.add("hidden");
-    $("add-title").value = ""; $("add-files").value = "";
-    toast(`'${title}' 추가 완료 (${urls.length}쪽)`);
-  }catch(e){
-    toast("업로드 실패: " + (e.message || e));
-  }finally{
-    btn.disabled = false; btn.textContent = "올리기";
-  }
-};
+/* ---------------- 곡 추가 (PDF 분할 등록 방식으로 교체됨) ---------------- */
 
 /* PDF → 페이지별 JPEG 변환 (브라우저 안에서 처리, 서버 불필요) */
 let _pdfWorkerReady = false;
