@@ -460,8 +460,9 @@
     <input id="join-name" class="field" placeholder="내 이름" maxlength="10" />
     <input id="join-pass" class="field" type="password" placeholder="방 비밀번호 (있는 경우)" maxlength="20" />
     <div class="role-row">
-      <button class="btn selected" id="role-member">팀원</button>
-      <button class="btn" id="role-accomp">반주자</button>
+      <button class="btn" id="role-leader">🎤 리더</button>
+      <button class="btn selected" id="role-member">🎵 팀원</button>
+      <button class="btn" id="role-accomp">🎹 반주자</button>
     </div>
     <button class="btn primary" id="btn-join">입장하기</button>
     <button class="btn ghost" id="btn-join-cancel">취소</button>
@@ -520,6 +521,14 @@
       <button class="icon-btn" id="btn-undo">↩ 되돌리기</button>
       <button class="icon-btn" id="btn-erase">지우기</button>
       <button class="icon-btn" id="btn-note">📝 멘트</button>
+    </div>
+    <!-- 팀원·반주자 도구 바 -->
+    <div class="tool-row hidden" id="member-tool-row">
+      <button class="icon-btn" id="btn-member-memo">📝 내 메모</button>
+      <button class="icon-btn" id="btn-member-draw">✏️ 내 펜</button>
+      <button class="icon-btn" id="btn-member-undo">↩ 되돌리기</button>
+      <button class="icon-btn" id="btn-member-erase">지우기</button>
+      <button class="icon-btn" id="btn-member-duo">2쪽 보기</button>
     </div>
   </div>
 </div>
@@ -731,8 +740,9 @@
     <p class="note" id="room-pass-label"></p>
     <input id="room-pass-input" class="field" type="password" placeholder="방 비밀번호" maxlength="20" />
     <div class="role-row" style="margin-top:4px">
-      <button class="btn selected" id="rp-role-member">팀원</button>
-      <button class="btn" id="rp-role-accomp">반주자</button>
+      <button class="btn" id="rp-role-leader">🎤 리더</button>
+      <button class="btn selected" id="rp-role-member">🎵 팀원</button>
+      <button class="btn" id="rp-role-accomp">🎹 반주자</button>
     </div>
     <button class="btn primary" id="btn-room-pass-ok">입장</button>
     <button class="btn ghost" id="btn-room-pass-cancel">취소</button>
@@ -767,6 +777,17 @@
     </div>
     <button class="btn primary" id="btn-tb-place">악보에 배치하기</button>
     <button class="btn ghost" id="btn-tb-cancel">취소</button>
+  </div>
+</div>
+
+<!-- 팀원 개인 메모 모달 -->
+<div class="modal-veil hidden" id="modal-member-memo">
+  <div class="modal">
+    <h3>📝 내 메모</h3>
+    <p class="note">나만 보이는 메모입니다. 다른 사람에게는 표시되지 않아요.</p>
+    <textarea id="member-memo-text" class="field" style="min-height:140px" placeholder="곡 순서, 악기 세팅, 개인 참고사항 등 자유롭게 적어보세요"></textarea>
+    <button class="btn primary" id="btn-member-memo-save">저장</button>
+    <button class="btn ghost" id="btn-member-memo-cancel">닫기</button>
   </div>
 </div>
 
@@ -1398,11 +1419,16 @@ $("btn-join-cancel").onclick   = ()=>showPanel(null);
 /* 역할 선택 (방 목록 클릭 시 비번 모달 안과 코드 입장 패널) */
 function setRole(r){
   joinRole = r;
-  [$("role-member"),$("role-accomp")].forEach(b=>b.classList.toggle("selected", b.id === "role-"+r));
-  [$("rp-role-member"),$("rp-role-accomp")].forEach(b=>b.classList.toggle("selected", b.id === "rp-role-"+r));
+  ["leader","member","accomp"].forEach(ro=>{
+    const a = $("role-"+ro), b = $("rp-role-"+ro);
+    if(a) a.classList.toggle("selected", ro === r);
+    if(b) b.classList.toggle("selected", ro === r);
+  });
 }
-$("role-member").onclick   = ()=>setRole("member");
-$("role-accomp").onclick   = ()=>setRole("accomp");
+$("role-leader").onclick  = ()=>setRole("leader");
+$("role-member").onclick  = ()=>setRole("member");
+$("role-accomp").onclick  = ()=>setRole("accomp");
+$("rp-role-leader").onclick = ()=>setRole("leader");
 $("rp-role-member").onclick = ()=>setRole("member");
 $("rp-role-accomp").onclick = ()=>setRole("accomp");
 
@@ -1726,6 +1752,107 @@ function placeTb(cv, x, y){
   setTool(null);
 }
 
+/* ================================================================
+   팀원·반주자 기능
+   ================================================================ */
+
+// 팀원 개인 메모 (localStorage, 방별 저장)
+function memoKey(){ return "praise_memo_" + (state.room ? state.room.id : ""); }
+
+$("btn-member-memo").onclick = ()=>{
+  $("member-memo-text").value = localStorage.getItem(memoKey()) || "";
+  $("modal-member-memo").classList.remove("hidden");
+  setTimeout(()=>$("member-memo-text").focus(), 100);
+};
+$("btn-member-memo-save").onclick = ()=>{
+  localStorage.setItem(memoKey(), $("member-memo-text").value);
+  $("modal-member-memo").classList.add("hidden");
+  toast("메모를 저장했어요 (나만 볼 수 있어요)");
+};
+$("btn-member-memo-cancel").onclick = ()=>$("modal-member-memo").classList.add("hidden");
+
+// 팀원 펜 (내 화면에만 표시 — 다른 사람에게 전송 안 함)
+let memberTool = null;
+function setMemberTool(t){
+  memberTool = (memberTool === t) ? null : t;
+  $("btn-member-draw").classList.toggle("on", memberTool === "draw");
+  if(memberTool === "draw") toast("내 화면에만 보이는 펜이에요");
+}
+$("btn-member-draw").onclick = ()=>{
+  buildPenModal();
+  $("modal-pen").classList.remove("hidden");
+  // 팀원 펜 모달: 확인 시 팀원 그리기 모드로
+  $("btn-pen-start").onclick = ()=>{
+    localStorage.setItem("praise_pen", JSON.stringify(pen));
+    $("modal-pen").classList.add("hidden");
+    setMemberTool("draw");
+  };
+};
+
+// 팀원 되돌리기 / 지우기
+$("btn-member-undo").onclick = ()=>{
+  const key = annKeyCurrent();
+  if(!key) return;
+  if(undoKey(key)){
+    toast("방금 표시를 되돌렸어요");
+  }else{
+    toast("되돌릴 표시가 없어요");
+  }
+};
+$("btn-member-erase").onclick = ()=>{
+  document.querySelectorAll(".pane canvas").forEach(cv=>{
+    const key = cv.dataset.key;
+    state.ann[key] = { strokes:[], badges:[], order:[], textboxes:[] };
+    drawAnn(cv);
+  });
+  toast("내 화면의 표시를 지웠어요");
+};
+
+// 팀원 2쪽 보기
+$("btn-member-duo").onclick = ()=>{
+  state.duo = !state.duo;
+  $("btn-duo").classList.toggle("on", state.duo);
+  $("btn-member-duo").classList.toggle("on", state.duo);
+  render();
+  if(state.duo) toast("가로 화면에서 보면 더 좋아요");
+};
+
+// 팀원 펜 그리기: attachDrawing에서 memberTool도 처리하도록
+// (기존 attachDrawing은 리더 전용이므로 팀원용 별도 처리)
+function attachMemberDrawing(cv){
+  let stroke = null;
+  const norm = (e)=>{
+    const r = cv.getBoundingClientRect();
+    return [ +((e.clientX-r.left)/r.width).toFixed(4), +((e.clientY-r.top)/r.height).toFixed(4) ];
+  };
+  cv.addEventListener("pointerdown", (e)=>{
+    if(memberTool !== "draw") return;
+    e.preventDefault(); cv.setPointerCapture(e.pointerId);
+    stroke = [norm(e)];
+  });
+  cv.addEventListener("pointermove", (e)=>{
+    if(!stroke) return;
+    stroke.push(norm(e));
+    const ctx = cv.getContext("2d");
+    const w = cv.width, h = cv.height;
+    ctx.strokeStyle = pen.c; ctx.lineCap="round";
+    ctx.lineWidth = Math.max(2, w * pen.w);
+    const a = stroke[stroke.length-2], b = stroke[stroke.length-1];
+    ctx.beginPath(); ctx.moveTo(a[0]*w, a[1]*h); ctx.lineTo(b[0]*w, b[1]*h); ctx.stroke();
+  });
+  cv.addEventListener("pointerup", ()=>{
+    if(!stroke) return;
+    if(stroke.length > 1){
+      const key = cv.dataset.key;
+      const st = { p: stroke, c: pen.c, w: pen.w };
+      const a = getAnn(key);
+      a.strokes.push(st); a.order.push("s");
+      // 팀원 펜은 다른 사람에게 전송 안 함 (내 화면만)
+    }
+    stroke = null;
+  });
+}
+
 /* ================================================================ */
 
 /* ---------------- 방 입장 ---------------- */
@@ -1745,8 +1872,10 @@ async function enterRoom(room, role){
   $("presence-count").textContent = MODE === "demo" ? "로컬 모드" : "";
 
   const isLeader = role === "leader";
+  const isMember = role === "member" || role === "accomp";
   $("msg-row").classList.toggle("hidden", !isLeader);
   $("tool-row").classList.toggle("hidden", !isLeader);
+  $("member-tool-row").classList.toggle("hidden", !isMember);
   $("btn-settings").classList.toggle("hidden", !isLeader);
   $("btn-share").classList.toggle("hidden", !isLeader);
   $("btn-room-settings").classList.toggle("hidden", !isLeader);
@@ -1758,6 +1887,9 @@ async function enterRoom(room, role){
   $("btn-free").classList.toggle("hidden", isLeader);
   $("btn-free").classList.remove("on");
   $("btn-free").textContent = "🔓 자유";
+
+  // 팀원 도구 버튼 상태 초기화
+  if($("btn-member-duo")) $("btn-member-duo").classList.toggle("on", state.duo);
   applyInvert();
 
   buildChips();
@@ -1938,6 +2070,7 @@ function buildPane(song, page){
   const ready = ()=>{ fitCanvas(cv, img); drawAnn(cv); };
   if(img.complete) requestAnimationFrame(ready); else img.onload = ready;
   if(state.role === "leader") attachDrawing(cv);
+  else attachMemberDrawing(cv);
   return pane;
 }
 
