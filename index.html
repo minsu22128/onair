@@ -337,6 +337,56 @@
   .pt-row .btn{ flex:none; width:64px; font-size:22px; padding:10px; }
   .pt-row .pt-val{ min-width:80px; text-align:center; font-size:22px; font-weight:800; color:var(--accent); }
 
+  /* ---------- 방 목록 ---------- */
+  #screen-rooms{
+    min-height:100dvh; display:flex; flex-direction:column; align-items:center;
+    padding:0 0 40px;
+  }
+  .rooms-head{
+    width:100%; max-width:440px; padding:16px 20px 8px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .rooms-head h2{ margin:0; font-size:20px; font-weight:800; flex:1; }
+  .tab-row{
+    width:100%; max-width:440px; padding:0 20px 12px;
+    display:flex; gap:0; border-bottom:1px solid var(--line);
+  }
+  .tab-btn{
+    flex:1; background:none; color:var(--dim); font-size:15px; font-weight:600;
+    padding:10px 0; border-bottom:2px solid transparent; border-radius:0;
+  }
+  .tab-btn.on{ color:var(--accent); border-bottom-color:var(--accent); }
+  .rooms-list{ width:100%; max-width:440px; padding:12px 20px; display:flex; flex-direction:column; gap:10px; }
+  .room-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px; display:flex; align-items:center; gap:12px; cursor:pointer;
+    transition:border-color .15s;
+  }
+  .room-card:active{ border-color:var(--accent); }
+  .room-card.mine{ border-color:rgba(232,176,75,.4); }
+  .room-card .rc-ico{
+    flex:none; width:44px; height:44px; border-radius:10px;
+    background:rgba(232,176,75,.12); border:1px solid rgba(232,176,75,.25);
+    display:flex; align-items:center; justify-content:center; font-size:20px;
+  }
+  .room-card .rc-body{ flex:1; min-width:0; }
+  .room-card .rc-name{ font-weight:700; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .room-card .rc-meta{ font-size:13px; color:var(--dim); margin-top:2px; display:flex; gap:8px; flex-wrap:wrap; }
+  .rc-badge{
+    display:inline-block; font-size:11px; font-weight:700; padding:2px 7px;
+    border-radius:99px; background:rgba(232,176,75,.15); color:var(--accent);
+    border:1px solid rgba(232,176,75,.3);
+  }
+  .rc-badge.lock{ background:rgba(255,255,255,.06); color:var(--dim); border-color:var(--line); }
+  .rooms-empty{ color:var(--dim); font-size:14px; text-align:center; padding:40px 0; line-height:1.8; }
+
+  /* ---------- 방 만들기/입장 패널 ---------- */
+  .panel-toggle{
+    width:100%; max-width:440px; padding:0 20px 8px;
+    display:flex; gap:8px;
+  }
+  .panel-toggle .btn{ flex:1; font-size:14px; padding:12px; }
+
   /* ---------- 곡 멘트 바 ---------- */
   .note-bar{
     flex:none; background:rgba(232,176,75,.12); border-bottom:1px solid rgba(232,176,75,.3);
@@ -350,42 +400,65 @@
 </head>
 <body>
 
-<!-- ============ 홈 (랜딩) ============ -->
-<div id="screen-home">
+<!-- ============ 방 목록 화면 ============ -->
+<div id="screen-rooms">
 
-  <div class="hero">
+  <div class="hero" style="padding:36px 24px 20px">
     <div class="badge" id="brand-badge">WORSHIP TEAM LIVE</div>
     <h1 id="brand-title">ON AIR</h1>
-    <p class="tagline" id="brand-tagline">무대 위의 모든 악보를, 하나의 호흡으로</p>
-    <div class="cta">
+    <p class="tagline" id="brand-tagline" style="font-size:15px;margin-top:6px"></p>
+    <div class="cta" style="margin-top:14px">
       <button class="btn" id="btn-theme-home">🎨 테마</button>
       <button class="btn hidden" id="btn-install">📲 앱 설치</button>
     </div>
   </div>
 
-  <div class="mode-banner cloud hidden" id="mode-banner"></div>
-
-  <div class="home-card" id="start-anchor" style="margin-top:8px">
-    <h3>방 만들기</h3>
-    <input id="create-name" class="field" placeholder="방 이름 (예: 주일 3부 찬양팀)" maxlength="20" />
-    <button class="btn primary" id="btn-create">리더로 시작</button>
+  <!-- 계정 -->
+  <div style="width:100%;max-width:440px;padding:0 20px 4px;display:flex;align-items:center;gap:8px">
+    <span id="account-desc" style="flex:1;font-size:14px;color:var(--dim)"></span>
+    <button class="icon-btn" id="btn-auth-open">로그인</button>
+    <button class="icon-btn hidden" id="btn-logout">로그아웃</button>
   </div>
 
-  <div class="home-card">
+  <!-- 탭: 전체방 / 내 방 -->
+  <div class="tab-row">
+    <button class="tab-btn on" id="tab-all">전체 방</button>
+    <button class="tab-btn" id="tab-mine">내 방</button>
+  </div>
+
+  <!-- 방 목록 -->
+  <div class="rooms-list" id="rooms-list">
+    <div class="rooms-empty">불러오는 중...</div>
+  </div>
+
+  <!-- 방 만들기 / 코드 입장 토글 -->
+  <div class="panel-toggle">
+    <button class="btn primary" id="btn-show-create">＋ 방 만들기</button>
+    <button class="btn" id="btn-show-join">🔑 코드 입장</button>
+  </div>
+
+  <!-- 방 만들기 패널 -->
+  <div class="home-card hidden" id="panel-create" style="margin-top:0;max-width:400px;width:calc(100% - 40px)">
+    <h3>방 만들기</h3>
+    <input id="create-name" class="field" placeholder="방 이름 (예: 주일 3부 찬양팀)" maxlength="20" />
+    <input id="create-pass" class="field" type="password" placeholder="방 비밀번호 (없으면 빈칸)" maxlength="20" />
+    <p class="note">비밀번호를 설정하면 코드 입장 시 비번을 알아야 들어올 수 있어요.</p>
+    <button class="btn primary" id="btn-create">방 만들기</button>
+    <button class="btn ghost" id="btn-create-cancel">취소</button>
+  </div>
+
+  <!-- 코드 입장 패널 -->
+  <div class="home-card hidden" id="panel-join" style="margin-top:0;max-width:400px;width:calc(100% - 40px)">
     <h3>코드로 입장</h3>
     <input id="join-code" class="field" placeholder="입장 코드 (6자리)" maxlength="6" autocapitalize="characters" style="text-transform:uppercase" />
     <input id="join-name" class="field" placeholder="내 이름" maxlength="10" />
+    <input id="join-pass" class="field" type="password" placeholder="방 비밀번호 (있는 경우)" maxlength="20" />
     <div class="role-row">
-      <button class="btn selected" data-role="member" id="role-member">팀원</button>
-      <button class="btn" data-role="accomp" id="role-accomp">반주자</button>
+      <button class="btn selected" id="role-member">팀원</button>
+      <button class="btn" id="role-accomp">반주자</button>
     </div>
     <button class="btn primary" id="btn-join">입장하기</button>
-  </div>
-
-  <div class="home-card" id="account-card">
-    <button class="btn" id="btn-auth-open">로그인 · 회원가입</button>
-    <button class="btn ghost hidden" id="btn-logout">로그아웃</button>
-    <p id="account-desc" style="text-align:center"></p>
+    <button class="btn ghost" id="btn-join-cancel">취소</button>
   </div>
 
   <div class="home-foot" id="home-foot">
@@ -393,6 +466,9 @@
     <button class="link-btn" id="btn-admin-open">관리자</button>
   </div>
 </div>
+
+<!-- ============ 홈 (레거시 id 호환용, 숨김) ============ -->
+<div id="screen-home" class="hidden"></div>
 
 <!-- ============ 방 ============ -->
 <div id="screen-room" class="hidden">
@@ -410,6 +486,7 @@
     <button class="icon-btn hidden" id="btn-free">🔓 자유</button>
     <button class="icon-btn" id="btn-theme-room">🎨</button>
     <button class="icon-btn" id="btn-font">가</button>
+    <button class="icon-btn hidden" id="btn-room-settings">⚙️</button>
     <button class="icon-btn hidden" id="btn-duo">2쪽</button>
     <button class="icon-btn hidden" id="btn-share">공유</button>
     <button class="icon-btn hidden" id="btn-settings">설정</button>
@@ -602,7 +679,32 @@
   </div>
 </div>
 
-<!-- 대기 화면 (블랙아웃) -->
+<!-- 방 비밀번호 확인 모달 -->
+<div class="modal-veil hidden" id="modal-room-pass">
+  <div class="modal">
+    <h3>🔒 비밀번호 입력</h3>
+    <p class="note" id="room-pass-label"></p>
+    <input id="room-pass-input" class="field" type="password" placeholder="방 비밀번호" maxlength="20" />
+    <div class="role-row" style="margin-top:4px">
+      <button class="btn selected" id="rp-role-member">팀원</button>
+      <button class="btn" id="rp-role-accomp">반주자</button>
+    </div>
+    <button class="btn primary" id="btn-room-pass-ok">입장</button>
+    <button class="btn ghost" id="btn-room-pass-cancel">취소</button>
+  </div>
+</div>
+
+<!-- 방 설정 모달 (리더 전용) -->
+<div class="modal-veil hidden" id="modal-room-settings">
+  <div class="modal">
+    <h3>⚙️ 방 설정</h3>
+    <input id="rs-name" class="field" placeholder="방 이름" maxlength="20" />
+    <input id="rs-pass" class="field" type="password" placeholder="새 비밀번호 (없애려면 빈칸)" maxlength="20" />
+    <p class="note">비밀번호를 바꾸면 기존 비번은 무효가 됩니다.</p>
+    <button class="btn primary" id="btn-rs-save">저장</button>
+    <button class="btn ghost" id="btn-rs-cancel">취소</button>
+  </div>
+</div>
 <div id="blackout">
   <div class="bo-clock" id="bo-clock">--:--</div>
   <div class="bo-title" id="bo-title">잠시 준비 중입니다</div>
@@ -672,13 +774,27 @@ const demo = {
     try{ localStorage.setItem("praise_demo", JSON.stringify(db)); return true; }
     catch(e){ toast("로컬 저장 공간이 가득 찼어요. 곡을 지워주세요."); return false; }
   },
-  async createRoom(name, code){
+  async listRooms(ownerOnly){
+    const db = this.load();
+    const rooms = Object.values(db.rooms || {});
+    if(ownerOnly){
+      const saved = JSON.parse(localStorage.getItem("praise_my_rooms") || "[]");
+      return rooms.filter(r => saved.includes(r.id));
+    }
+    return rooms.slice().sort((a,b)=> (b.created_at||"").localeCompare(a.created_at||""));
+  },
+  async createRoom(name, code, password){
     const db = this.load(); db.rooms = db.rooms || {}; db.songs = db.songs || {};
     code = code || genRoomCode();
     const presets = (appSettings.default_presets && appSettings.default_presets.length) ? appSettings.default_presets.slice() : [...DEFAULT_PRESETS];
-    const room = { id:"room-"+code, code, name, current_song:0, current_page:0, presets };
+    const pwHash = password ? await hashPass(password) : "";
+    const room = { id:"room-"+code, code, name, current_song:0, current_page:0, presets,
+      pw_hash: pwHash, has_password: !!password, created_at: new Date().toISOString() };
     db.rooms[code] = room; db.songs[room.id] = db.songs[room.id] || [];
-    this.save(db); return room;
+    this.save(db);
+    const mine = JSON.parse(localStorage.getItem("praise_my_rooms") || "[]");
+    if(!mine.includes(room.id)){ mine.push(room.id); localStorage.setItem("praise_my_rooms", JSON.stringify(mine)); }
+    return room;
   },
   async findRoom(code){ return (this.load().rooms || {})[code] || null; },
   async updateRoom(id, patch){
@@ -770,27 +886,41 @@ const cloud = {
     const { data } = await sb.auth.getUser();
     return data.user ? data.user.id : null;
   },
-  async createRoom(name){
+  async listRooms(ownerOnly){
+    if(!await this.ensureAuth()) return [];
+    let q = sb.from("praise_rooms").select("id,code,name,has_password,owner,current_song,current_page,presets,created_at,pw_hash").order("created_at", { ascending:false }).limit(50);
+    if(ownerOnly){
+      const uid = await this.currentUid();
+      if(!uid) return [];
+      q = q.eq("owner", uid);
+    }
+    const { data } = await q;
+    return data || [];
+  },
+  async createRoom(name, _code, password){
     if(!await this.ensureAuth()) return null;
     const uid = await this.currentUid();
     const presets = (appSettings.default_presets && appSettings.default_presets.length) ? appSettings.default_presets : DEFAULT_PRESETS;
+    const pwHash = password ? await hashPass(password) : "";
     let data = null, lastErr = null;
     for(let attempt = 0; attempt < 6; attempt++){
       const code = genRoomCode();
-      const res = await sb.from("praise_rooms").insert({ code, name, presets, owner: uid }).select().single();
+      const res = await sb.from("praise_rooms")
+        .insert({ code, name, presets, owner: uid, pw_hash: pwHash, has_password: !!password })
+        .select().single();
       if(!res.error){ data = res.data; break; }
       lastErr = res.error;
-      if(res.error.code !== "23505") break;   // 중복이 아니면 즉시 중단
+      if(res.error.code !== "23505") break;
     }
-    if(!data){ alert("방 생성 실패: " + (lastErr && lastErr.message) + "\n\n보안강화.sql을 SQL Editor에서 실행했는지 확인해주세요."); return null; }
+    if(!data){ alert("방 생성 실패: " + (lastErr && lastErr.message) + "\n\n설치.sql과 방설정.sql을 SQL Editor에서 실행해주세요."); return null; }
     return data;
   },
   async findRoom(code){
     if(!await this.ensureAuth()) return null;
-    const { data } = await sb.from("praise_rooms").select().eq("code", code).maybeSingle();
+    const { data } = await sb.from("praise_rooms").select().eq("code", code.toUpperCase()).maybeSingle();
     return data;
   },
-  async updateRoom(id, patch){ await sb.from("praise_rooms").update(patch).eq("id", id); },
+  async updateRoomSettings(id, patch){ await sb.from("praise_rooms").update(patch).eq("id", id); },
   async listSongs(roomId){
     const { data } = await sb.from("praise_songs").select()
       .eq("room_id", roomId).order("sort").order("created_at");
@@ -900,6 +1030,7 @@ async function init(){
   refreshAccountUI();
   startClock();
   initPWA();
+  loadRoomsList();   // 방 목록 로드
 }
 
 function applyBranding(){
@@ -958,15 +1089,13 @@ function currentUser(){
 function refreshAccountUI(){
   const u = currentUser();
   if(u){
-    $("account-desc").innerHTML = `<b>${u.name}</b>님 (${u.nickname})`;
+    $("account-desc").textContent = `${u.name} (${u.nickname})`;
     $("btn-auth-open").classList.add("hidden");
     $("btn-logout").classList.remove("hidden");
-    $("join-name").value = u.nickname;
   }else{
-    $("account-desc").textContent = "비회원으로도 바로 이용할 수 있어요";
+    $("account-desc").textContent = "비회원으로 이용 중";
     $("btn-auth-open").classList.remove("hidden");
     $("btn-logout").classList.add("hidden");
-    $("join-name").value = localStorage.getItem("praise_name") || "";
   }
 }
 async function hashPass(s){
@@ -990,7 +1119,7 @@ $("auth-tab-signup").onclick = ()=>setAuthMode("signup");
 $("auth-tab-login").onclick = ()=>setAuthMode("login");
 $("btn-auth-open").onclick = ()=>{ setAuthMode("signup"); $("modal-auth").classList.remove("hidden"); };
 $("btn-auth-cancel").onclick = ()=>$("modal-auth").classList.add("hidden");
-$("btn-logout").onclick = async ()=>{ await api.logout(); localStorage.removeItem("praise_user"); refreshAccountUI(); toast("로그아웃했어요"); };
+$("btn-logout").onclick = async ()=>{ await api.logout(); localStorage.removeItem("praise_user"); refreshAccountUI(); loadRoomsList(); toast("로그아웃했어요"); };
 
 $("btn-auth-submit").onclick = async ()=>{
   const name = $("auth-name").value.trim();
@@ -1099,36 +1228,147 @@ function initPWA(){
 }
 init();
 
-/* ---------------- 홈 버튼 ---------------- */
+/* ================================================================
+   방 목록 화면
+   ================================================================ */
+let roomsTab = "all";   // "all" | "mine"
 let joinRole = "member";
-$("role-member").onclick = ()=>{ joinRole="member"; $("role-member").classList.add("selected"); $("role-accomp").classList.remove("selected"); };
-$("role-accomp").onclick = ()=>{ joinRole="accomp"; $("role-accomp").classList.add("selected"); $("role-member").classList.remove("selected"); };
 
+/* 탭 전환 */
+$("tab-all").onclick  = ()=>{ roomsTab="all";  $("tab-all").classList.add("on");  $("tab-mine").classList.remove("on"); loadRoomsList(); };
+$("tab-mine").onclick = ()=>{ roomsTab="mine"; $("tab-mine").classList.add("on"); $("tab-all").classList.remove("on"); loadRoomsList(); };
+
+/* 패널 토글 */
+function showPanel(which){
+  $("panel-create").classList.toggle("hidden", which !== "create");
+  $("panel-join").classList.toggle("hidden",   which !== "join");
+}
+$("btn-show-create").onclick = ()=>showPanel("create");
+$("btn-show-join").onclick   = ()=>showPanel("join");
+$("btn-create-cancel").onclick = ()=>showPanel(null);
+$("btn-join-cancel").onclick   = ()=>showPanel(null);
+
+/* 역할 선택 (방 목록 클릭 시 비번 모달 안과 코드 입장 패널) */
+function setRole(r){
+  joinRole = r;
+  [$("role-member"),$("role-accomp")].forEach(b=>b.classList.toggle("selected", b.id === "role-"+r));
+  [$("rp-role-member"),$("rp-role-accomp")].forEach(b=>b.classList.toggle("selected", b.id === "rp-role-"+r));
+}
+$("role-member").onclick   = ()=>setRole("member");
+$("role-accomp").onclick   = ()=>setRole("accomp");
+$("rp-role-member").onclick = ()=>setRole("member");
+$("rp-role-accomp").onclick = ()=>setRole("accomp");
+
+/* 방 목록 불러오기 */
+async function loadRoomsList(){
+  const box = $("rooms-list");
+  box.innerHTML = `<div class="rooms-empty">불러오는 중...</div>`;
+  const rooms = await api.listRooms(roomsTab === "mine");
+  box.innerHTML = "";
+  if(!rooms.length){
+    box.innerHTML = `<div class="rooms-empty">${roomsTab==="mine" ? "내가 만든 방이 없어요.<br/>＋ 방 만들기로 새 방을 열어보세요." : "아직 방이 없어요."}</div>`;
+    return;
+  }
+  const uid = currentUser() ? currentUser().nickname : null;
+  rooms.forEach(room=>{
+    const isMine = roomsTab === "mine" || (room.owner && uid && room.owner === uid);
+    const card = document.createElement("div");
+    card.className = "room-card" + (isMine ? " mine" : "");
+    card.innerHTML = `
+      <div class="rc-ico">${isMine ? "🎤" : "🎼"}</div>
+      <div class="rc-body">
+        <div class="rc-name">${room.name}</div>
+        <div class="rc-meta">
+          <span>코드 <b>${room.code}</b></span>
+          ${room.has_password ? '<span class="rc-badge lock">🔒 비번 있음</span>' : '<span class="rc-badge">🔓 자유 입장</span>'}
+          ${isMine ? '<span class="rc-badge">내 방</span>' : ""}
+        </div>
+      </div>`;
+    card.onclick = ()=>tryEnterRoom(room);
+    box.appendChild(card);
+  });
+}
+
+/* 방 입장 시도 (비번 확인 포함) */
+let pendingRoom = null;
+async function tryEnterRoom(room){
+  pendingRoom = room;
+  const u = currentUser();
+  const isMine = u && room.owner === u.uid;
+  if(isMine){
+    // 내 방이면 비번 없이 리더로 바로 입장
+    doEnterRoom(room, "leader");
+    return;
+  }
+  if(room.has_password){
+    $("room-pass-label").textContent = `"${room.name}" 방의 비밀번호를 입력하세요`;
+    $("room-pass-input").value = "";
+    setRole("member");
+    $("modal-room-pass").classList.remove("hidden");
+    setTimeout(()=>$("room-pass-input").focus(), 120);
+    return;
+  }
+  // 비번 없는 방: 역할 선택 없이 팀원으로 바로 입장
+  const name = u ? u.nickname : (localStorage.getItem("praise_name") || "팀원");
+  state.myName = name;
+  doEnterRoom(room, "member");
+}
+
+$("btn-room-pass-ok").onclick = async ()=>{
+  const pass = $("room-pass-input").value;
+  if(!pass) return toast("비밀번호를 입력하세요");
+  const hash = await hashPass(pass);
+  if(hash !== pendingRoom.pw_hash) return toast("비밀번호가 맞지 않아요");
+  $("modal-room-pass").classList.add("hidden");
+  const u = currentUser();
+  state.myName = u ? u.nickname : (localStorage.getItem("praise_name") || "팀원");
+  doEnterRoom(pendingRoom, joinRole);
+};
+$("btn-room-pass-cancel").onclick = ()=>{ $("modal-room-pass").classList.add("hidden"); pendingRoom = null; };
+$("room-pass-input").addEventListener("keydown", e=>{ if(e.key==="Enter") $("btn-room-pass-ok").click(); });
+
+/* 방 만들기 */
 $("btn-create").onclick = async ()=>{
   const name = $("create-name").value.trim();
+  const pass = $("create-pass").value;
   if(!name) return toast("방 이름을 입력하세요");
   const btn = $("btn-create"); btn.disabled = true;
-  const room = await api.createRoom(name);
+  const room = await api.createRoom(name, null, pass);
   btn.disabled = false;
   if(!room) return;
   const u = currentUser();
   state.myName = u ? u.nickname : "리더";
-  enterRoom(room, "leader");
+  $("create-name").value = ""; $("create-pass").value = "";
+  showPanel(null);
+  doEnterRoom(room, "leader");
 };
 
+/* 코드로 입장 */
 $("btn-join").onclick = async ()=>{
   const code = $("join-code").value.trim().toUpperCase();
   const u = currentUser();
   const name = (u ? u.nickname : $("join-name").value.trim()) || "팀원";
+  const pass = $("join-pass").value;
   if(code.length !== 6) return toast("6자리 코드를 입력하세요");
   const btn = $("btn-join"); btn.disabled = true;
   const room = await api.findRoom(code);
   btn.disabled = false;
   if(!room) return toast("방을 찾을 수 없어요. 코드를 확인하세요");
+  if(room.has_password){
+    const hash = await hashPass(pass);
+    if(hash !== room.pw_hash) return toast("비밀번호가 맞지 않아요");
+  }
   if(!u) localStorage.setItem("praise_name", name);
   state.myName = name;
-  enterRoom(room, joinRole);
+  showPanel(null);
+  doEnterRoom(room, joinRole);
 };
+
+function doEnterRoom(room, role){
+  enterRoom(room, role);
+}
+
+/* ---------------------------------------------------------------- */
 
 /* ---------------- 방 입장 ---------------- */
 async function enterRoom(room, role){
@@ -1140,7 +1380,7 @@ async function enterRoom(room, role){
   state.free = false; state.blackout = false;
   $("blackout").classList.remove("show");
 
-  $("screen-home").classList.add("hidden");
+  $("screen-rooms").classList.add("hidden");
   $("screen-room").classList.remove("hidden");
   $("room-name").textContent = room.name;
   $("room-code-label").textContent = "코드 " + room.code;
@@ -1151,6 +1391,7 @@ async function enterRoom(room, role){
   $("tool-row").classList.toggle("hidden", !isLeader);
   $("btn-settings").classList.toggle("hidden", !isLeader);
   $("btn-share").classList.toggle("hidden", !isLeader);
+  $("btn-room-settings").classList.toggle("hidden", !isLeader);
   $("nav-row").classList.remove("hidden");
   $("btn-prev").style.visibility = isLeader ? "visible" : "hidden";
   $("btn-next").style.visibility = isLeader ? "visible" : "hidden";
@@ -1172,7 +1413,8 @@ $("btn-back").onclick = ()=>{
   if(channel){ channel.close(); channel = null; }
   if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
   $("screen-room").classList.add("hidden");
-  $("screen-home").classList.remove("hidden");
+  $("screen-rooms").classList.remove("hidden");
+  loadRoomsList();   // 목록 최신화
 };
 
 /* ---------------- 화면 꺼짐 방지 ---------------- */
@@ -1899,7 +2141,25 @@ $("btn-note-save").onclick = async ()=>{
   toast(note ? "멘트를 저장했어요" : "멘트를 지웠어요");
 };
 
-/* ---------------- 반주자 2쪽 보기 ---------------- */
+/* ---------------- 방 설정 (리더 전용) ---------------- */
+$("btn-room-settings").onclick = ()=>{
+  $("rs-name").value = state.room.name;
+  $("rs-pass").value = "";
+  $("modal-room-settings").classList.remove("hidden");
+};
+$("btn-rs-cancel").onclick = ()=>$("modal-room-settings").classList.add("hidden");
+$("btn-rs-save").onclick = async ()=>{
+  const name = $("rs-name").value.trim();
+  const pass = $("rs-pass").value;
+  if(!name) return toast("방 이름을 입력하세요");
+  const pwHash = pass ? await hashPass(pass) : "";
+  const patch = { name, pw_hash: pwHash, has_password: !!pass };
+  await api.updateRoom(state.room.id, patch);
+  Object.assign(state.room, patch);
+  $("room-name").textContent = name;
+  $("modal-room-settings").classList.add("hidden");
+  toast("방 설정을 저장했어요");
+};
 $("btn-duo").onclick = ()=>{
   state.duo = !state.duo;
   $("btn-duo").classList.toggle("on", state.duo);
