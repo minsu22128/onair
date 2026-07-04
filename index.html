@@ -752,9 +752,9 @@
       (비워두면 이 기기 안에서만 동작하는 '로컬 모드')
    2) ADMIN_PIN: 관리자 비밀번호 — 꼭 바꿔서 쓰세요!
    ============================================================ */
-const SUPABASE_URL = "";
-const SUPABASE_ANON_KEY = "";
-const ADMIN_PIN = "0000";
+const SUPABASE_URL = "https://dgjotupusjfunwatxatw.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRnam90dXB1c2pmdW53YXR4YXR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxNDUyMDcsImV4cCI6MjA5ODcyMTIwN30.gkIz1ZygkEyqADa_YFAlOZ5hAfvTSb5MeWM77ydNpko";
+const ADMIN_PIN = "4695";
 
 const CONFIGURED = /supabase\.co/.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 30;
 const MODE = CONFIGURED ? "cloud" : "demo";
