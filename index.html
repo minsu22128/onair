@@ -1426,6 +1426,8 @@ async function loadRoomsList(){
   rooms.forEach(room=>{
     const isMine = roomsTab === "mine" || (room.owner && uid && room.owner === uid);
     const canDelete = isMine || state.isAdmin;
+    const prevRole = savedRole(room.id);
+    const roleLabel = prevRole==="leader"?"🎤 리더":prevRole==="accomp"?"🎹 반주자":"🎵 팀원";
     const card = document.createElement("div");
     card.className = "room-card" + (isMine ? " mine" : "");
     card.innerHTML = `
@@ -1436,6 +1438,7 @@ async function loadRoomsList(){
           <span>코드 <b>${room.code}</b></span>
           ${room.has_password ? '<span class="rc-badge lock">🔒 비번 있음</span>' : '<span class="rc-badge">🔓 자유 입장</span>'}
           ${isMine ? '<span class="rc-badge">내 방</span>' : ""}
+          <span class="rc-badge" style="background:rgba(127,201,127,.15);color:#7fc97f;border-color:rgba(127,201,127,.3)">${roleLabel}</span>
         </div>
       </div>
       <div class="rc-actions" onclick="event.stopPropagation()">
@@ -1464,40 +1467,60 @@ async function loadRoomsList(){
 
 /* 방 입장 시도 (비번 확인 포함) */
 let pendingRoom = null;
+/* 역할 저장 키: 방 ID별로 localStorage에 저장 */
+function savedRole(roomId){ return localStorage.getItem("praise_role_"+roomId) || "member"; }
+function saveRole(roomId, role){ localStorage.setItem("praise_role_"+roomId, role); }
+
 async function tryEnterRoom(room){
   pendingRoom = room;
   const u = currentUser();
-  const isMine = u && room.owner === u.uid;
+  const uid = u ? u.nickname : null;
+  const isMine = uid && room.owner && (
+    // 클라우드: owner UUID vs 로컬: nickname 기반
+    room.owner === uid || room.owner === ("room-"+room.code)
+  );
+  const prevRole = savedRole(room.id);
+
   if(isMine){
-    // 내 방이면 비번 없이 리더로 바로 입장
     doEnterRoom(room, "leader");
     return;
   }
   if(room.has_password){
     $("room-pass-label").textContent = `"${room.name}" 방의 비밀번호를 입력하세요`;
     $("room-pass-input").value = "";
-    setRole("member");
+    setRole(prevRole);
     $("modal-room-pass").classList.remove("hidden");
     setTimeout(()=>$("room-pass-input").focus(), 120);
     return;
   }
-  // 비번 없는 방: 역할 선택 없이 팀원으로 바로 입장
-  const name = u ? u.nickname : (localStorage.getItem("praise_name") || "팀원");
-  state.myName = name;
-  doEnterRoom(room, "member");
+  // 비번 없는 방: 역할 선택 모달
+  $("room-pass-label").textContent = `"${room.name}" — 역할을 선택하세요`;
+  $("room-pass-input").closest(".modal").querySelector("input[type=password]").style.display="none";
+  setRole(prevRole);
+  $("modal-room-pass").classList.remove("hidden");
 }
 
 $("btn-room-pass-ok").onclick = async ()=>{
-  const pass = $("room-pass-input").value;
-  if(!pass) return toast("비밀번호를 입력하세요");
-  const hash = await hashPass(pass);
-  if(hash !== pendingRoom.pw_hash) return toast("비밀번호가 맞지 않아요");
+  if(!pendingRoom) return;
+  const passInput = $("room-pass-input");
+  if(pendingRoom.has_password){
+    const pass = passInput.value;
+    if(!pass) return toast("비밀번호를 입력하세요");
+    const hash = await hashPass(pass);
+    if(hash !== pendingRoom.pw_hash) return toast("비밀번호가 맞지 않아요");
+  }
   $("modal-room-pass").classList.add("hidden");
+  passInput.style.display = "";   // 숨겼던 입력창 복원
   const u = currentUser();
   state.myName = u ? u.nickname : (localStorage.getItem("praise_name") || "팀원");
+  saveRole(pendingRoom.id, joinRole);
   doEnterRoom(pendingRoom, joinRole);
 };
-$("btn-room-pass-cancel").onclick = ()=>{ $("modal-room-pass").classList.add("hidden"); pendingRoom = null; };
+$("btn-room-pass-cancel").onclick = ()=>{
+  $("modal-room-pass").classList.add("hidden");
+  $("room-pass-input").style.display="";
+  pendingRoom = null;
+};
 $("room-pass-input").addEventListener("keydown", e=>{ if(e.key==="Enter") $("btn-room-pass-ok").click(); });
 
 /* 방 만들기 */
@@ -1513,6 +1536,7 @@ $("btn-create").onclick = async ()=>{
   state.myName = u ? u.nickname : "리더";
   $("create-name").value = ""; $("create-pass").value = "";
   showPanel(null);
+  saveRole(room.id, "leader");
   doEnterRoom(room, "leader");
 };
 
@@ -1534,6 +1558,7 @@ $("btn-join").onclick = async ()=>{
   if(!u) localStorage.setItem("praise_name", name);
   state.myName = name;
   showPanel(null);
+  saveRole(room.id, joinRole);
   doEnterRoom(room, joinRole);
 };
 
