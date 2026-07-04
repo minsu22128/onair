@@ -415,7 +415,7 @@
     <p class="tagline" id="brand-tagline" style="font-size:15px;margin-top:6px"></p>
     <div class="cta" style="margin-top:14px">
       <button class="btn" id="btn-theme-home">🎨 테마</button>
-      <button class="btn hidden" id="btn-install">📲 앱 설치</button>
+      <button class="btn" id="btn-install-guide">📲 앱 설치</button>
     </div>
   </div>
 
@@ -689,7 +689,29 @@
   </div>
 </div>
 
-<!-- 방 비밀번호 확인 모달 -->
+<!-- 앱 설치 안내 모달 -->
+<div class="modal-veil hidden" id="modal-install">
+  <div class="modal">
+    <h3>📲 앱으로 설치하기</h3>
+    <div id="install-android" class="hidden">
+      <p class="note" style="font-size:14px;line-height:1.9">
+        <b>안드로이드 (크롬)</b><br/>
+        브라우저 오른쪽 위 <b>⋮ 메뉴</b> →<br/>
+        <b>"앱 설치"</b> 또는 <b>"홈 화면에 추가"</b> 클릭
+      </p>
+      <button class="btn primary" id="btn-install-prompt">바로 설치하기</button>
+    </div>
+    <div id="install-ios">
+      <p class="note" style="font-size:14px;line-height:1.9">
+        <b>아이폰 / 아이패드 (사파리)</b><br/>
+        하단 공유 버튼 <b>⬆</b> 클릭 →<br/>
+        <b>"홈 화면에 추가"</b> 선택 → <b>추가</b>
+      </p>
+    </div>
+    <p class="note" style="margin-top:8px">설치하면 주소창 없는 전체화면 앱으로 열립니다.</p>
+    <button class="btn ghost" id="btn-install-close">닫기</button>
+  </div>
+</div>
 <div class="modal-veil hidden" id="modal-room-pass">
   <div class="modal">
     <h3>🔒 비밀번호 입력</h3>
@@ -732,7 +754,7 @@
    ============================================================ */
 const SUPABASE_URL = "";
 const SUPABASE_ANON_KEY = "";
-const ADMIN_PIN = "0000";
+const ADMIN_PIN = "4695";
 
 const CONFIGURED = /supabase\.co/.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 30;
 const MODE = CONFIGURED ? "cloud" : "demo";
@@ -976,30 +998,39 @@ const cloud = {
   // ── 회원: Supabase Auth (별명 → 내부 이메일로 변환, 사용자는 별명만 입력) ──
   nickToEmail(nick){ return "u_" + nick.toLowerCase().replace(/[^a-z0-9_]/g,"") + "@onair.local"; },
   async signup(name, nickname, password){
+    try{ await sb.auth.signOut(); }catch(e){}   // 익명 세션 충돌 방지
     const email = this.nickToEmail(nickname);
     const { data, error } = await sb.auth.signUp({
       email, password,
       options: { data: { display_name: name, nickname } }
     });
     if(error){
-      if(/registered|exists/i.test(error.message)) toast("이미 사용 중인 별명이에요");
+      if(/already registered|user already exists|already been registered/i.test(error.message))
+        toast("이미 사용 중인 별명이에요. 로그인 탭을 이용해주세요");
       else toast("가입 실패: " + error.message);
+      await this.ensureAuth(true);
       return null;
     }
-    // 프로필 테이블에도 기록 (표시용)
     if(data.user){
-      await sb.from("praise_profiles").upsert({ id: data.user.id, name, nickname }).select();
+      try{ await sb.from("praise_profiles").upsert({ id: data.user.id, name, nickname }); }catch(e){}
     }
     return { name, nickname };
   },
   async login(nickname, password){
+    try{ await sb.auth.signOut(); }catch(e){}   // 기존 세션 정리
     const email = this.nickToEmail(nickname);
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    if(error){ toast("별명 또는 비밀번호가 맞지 않아요"); return null; }
+    if(error){
+      if(/invalid login|invalid credentials/i.test(error.message))
+        toast("별명 또는 비밀번호가 맞지 않아요");
+      else toast("로그인 실패: " + error.message);
+      await this.ensureAuth(true);
+      return null;
+    }
     const meta = data.user.user_metadata || {};
     return { name: meta.display_name || nickname, nickname: meta.nickname || nickname };
   },
-  async logout(){ await sb.auth.signOut(); await this.ensureAuth(); },
+  async logout(){ try{ await sb.auth.signOut(); }catch(e){} await this.ensureAuth(true); },
   async adminListRooms(){
     const { data } = await sb.from("praise_rooms").select("id,code,name").order("created_at", { ascending:false });
     return data || [];
@@ -1150,22 +1181,34 @@ $("btn-auth-submit").onclick = async ()=>{
   const nick = $("auth-nick").value.trim();
   const pass = $("auth-pass").value;
   if(!nick || !pass) return toast("별명과 비밀번호를 입력하세요");
-  if(!/^[A-Za-z0-9_]{2,12}$/.test(nick)) return toast("별명은 영문·숫자·밑줄 2~12자로 해주세요");
   if(pass.length < 6) return toast("비밀번호는 6자 이상으로 해주세요");
-  const btn = $("btn-auth-submit"); btn.disabled = true;
-  let u = null;
+
+  // 별명 형식 검사는 가입할 때만
   if(authMode === "signup"){
-    if(!name){ btn.disabled = false; return toast("이름을 입력하세요"); }
-    u = await api.signup(name, nick, pass);
-  }else{
-    u = await api.login(nick, pass);
+    if(!name) return toast("이름을 입력하세요");
+    if(!/^[A-Za-z0-9_]{2,12}$/.test(nick)) return toast("별명은 영문·숫자·밑줄 2~12자로 해주세요");
+  }
+
+  const btn = $("btn-auth-submit"); btn.disabled = true;
+  btn.textContent = authMode === "signup" ? "가입 중..." : "로그인 중...";
+  let u = null;
+  try{
+    if(authMode === "signup"){
+      u = await api.signup(name, nick, pass);
+    }else{
+      u = await api.login(nick, pass);
+    }
+  }catch(e){
+    toast("오류: " + (e.message || e));
   }
   btn.disabled = false;
+  btn.textContent = authMode === "signup" ? "가입하기" : "로그인";
   if(!u) return;
   localStorage.setItem("praise_user", JSON.stringify(u));
   $("modal-auth").classList.add("hidden");
   refreshAccountUI();
-  toast(authMode === "signup" ? `${u.name}님, 가입을 환영해요!` : `${u.name}님, 어서오세요!`);
+  loadRoomsList();
+  toast(authMode === "signup" ? `${u.name}님, 환영해요!` : `${u.name}님, 어서오세요!`);
 };
 
 /* ---------------- 관리자 ---------------- */
@@ -1259,25 +1302,42 @@ function initPWA(){
   if("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")){
     navigator.serviceWorker.register("sw.js").catch(()=>{});
   }
+
+  // 이미 설치되어 실행 중이면 설치 버튼 숨김
   const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-  if(standalone) return;
+  if(standalone){
+    $("btn-install-guide").classList.add("hidden");
+    return;
+  }
+
+  // 안드로이드 크롬: 설치 프롬프트 캐치
   window.addEventListener("beforeinstallprompt", (e)=>{
     e.preventDefault();
     deferredInstall = e;
-    $("btn-install").classList.remove("hidden");
   });
-  $("btn-install").onclick = async ()=>{
-    if(!deferredInstall) return;
-    deferredInstall.prompt();
-    const { outcome } = await deferredInstall.userChoice;
-    if(outcome === "accepted") toast("앱이 설치됐어요! 홈 화면에서 열어보세요");
-    deferredInstall = null;
-    $("btn-install").classList.add("hidden");
-  };
   window.addEventListener("appinstalled", ()=>{
-    $("btn-install").classList.add("hidden");
+    $("btn-install-guide").classList.add("hidden");
     toast("설치 완료! 홈 화면 아이콘으로 열 수 있어요");
   });
+
+  // 설치 안내 버튼
+  $("btn-install-guide").onclick = ()=>{
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    $("install-ios").classList.toggle("hidden", !isIOS);
+    $("install-android").classList.toggle("hidden", isIOS);
+    $("modal-install").classList.remove("hidden");
+  };
+  $("btn-install-close").onclick = ()=>$("modal-install").classList.add("hidden");
+  $("btn-install-prompt").onclick = async ()=>{
+    if(deferredInstall){
+      deferredInstall.prompt();
+      const { outcome } = await deferredInstall.userChoice;
+      if(outcome === "accepted"){ $("modal-install").classList.add("hidden"); toast("설치됐어요!"); }
+      deferredInstall = null;
+    }else{
+      toast("브라우저 메뉴 → '앱 설치' 를 눌러주세요");
+    }
+  };
 }
 init();
 
