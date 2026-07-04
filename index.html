@@ -679,6 +679,10 @@
       <button class="btn" data-adm-theme="blue">미드나잇</button>
     </div>
     <p class="note">방 관리</p>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input id="admin-new-room" class="field" placeholder="새 방 이름" maxlength="20" style="flex:1" />
+      <button class="btn primary" id="btn-admin-create-room" style="flex:none;padding:12px 14px;font-size:14px">만들기</button>
+    </div>
     <div class="admin-list" id="admin-rooms"></div>
     <button class="btn primary" id="btn-admin-save">저장</button>
     <button class="btn ghost" id="btn-admin-close">닫기</button>
@@ -741,7 +745,8 @@ let wakeLock = null;
 const state = {
   room: null, songs: [], songIdx: 0, page: 0,
   role: "member", myName: "", duo: false, tool: null,
-  ann: {},   // { "songId:page": { strokes:[], badges:[] } }
+  ann: {}, free: false, blackout: false,
+  isAdmin: false,   // 관리자 모드 (PIN 확인 후 활성화)
 };
 
 /* ---------------- 공통 유틸 ---------------- */
@@ -1160,6 +1165,8 @@ $("btn-admin-pin-cancel").onclick = ()=>$("modal-admin-pin").classList.add("hidd
 $("btn-admin-pin-ok").onclick = async ()=>{
   if($("admin-pin").value !== ADMIN_PIN) return toast("PIN이 맞지 않아요");
   $("modal-admin-pin").classList.add("hidden");
+  state.isAdmin = true;
+  loadRoomsList();   // 삭제 버튼 표시를 위해 목록 갱신
   await openAdminPanel();
 };
 async function openAdminPanel(){
@@ -1174,6 +1181,12 @@ async function openAdminPanel(){
       document.querySelectorAll("[data-adm-theme]").forEach(x=>x.classList.toggle("sel", x === b));
     };
   });
+  await refreshAdminRoomList();
+  $("admin-new-room").value = "";
+  $("modal-admin").classList.remove("hidden");
+}
+
+async function refreshAdminRoomList(){
   const list = $("admin-rooms");
   list.innerHTML = "<div class='row'>불러오는 중...</div>";
   const rooms = await api.adminListRooms();
@@ -1181,20 +1194,40 @@ async function openAdminPanel(){
   rooms.forEach(r=>{
     const row = document.createElement("div");
     row.className = "row";
-    row.innerHTML = `<span class="grow">${r.name} <small style="color:var(--dim)">코드 ${r.code}</small></span>`;
+    row.innerHTML = `
+      <span class="grow">
+        ${r.name}
+        <small style="color:var(--dim)"> 코드 <b>${r.code}</b>
+        ${r.has_password ? " 🔒" : " 🔓"}</small>
+      </span>`;
     const del = document.createElement("button");
     del.className = "mini"; del.textContent = "삭제"; del.style.color = "var(--danger)";
     del.onclick = async ()=>{
-      if(del.dataset.armed !== "1"){ del.dataset.armed="1"; del.textContent="한 번 더!"; setTimeout(()=>{del.dataset.armed="";del.textContent="삭제";},2500); return; }
+      if(del.dataset.armed !== "1"){ del.dataset.armed="1"; del.textContent="확인?"; setTimeout(()=>{ del.dataset.armed=""; del.textContent="삭제"; },2500); return; }
       await api.adminDeleteRoom(r.id);
-      row.remove(); toast("방을 삭제했어요");
+      row.remove();
+      loadRoomsList();
+      toast(`'${r.name}' 방을 삭제했어요`);
     };
     row.appendChild(del);
     list.appendChild(row);
   });
-  $("modal-admin").classList.remove("hidden");
 }
-$("btn-admin-close").onclick = ()=>$("modal-admin").classList.add("hidden");
+
+$("btn-admin-create-room").onclick = async ()=>{
+  const name = $("admin-new-room").value.trim();
+  if(!name) return toast("방 이름을 입력하세요");
+  const btn = $("btn-admin-create-room"); btn.disabled = true;
+  const room = await api.createRoom(name, null, "");
+  btn.disabled = false;
+  if(!room) return;
+  $("admin-new-room").value = "";
+  await refreshAdminRoomList();
+  loadRoomsList();
+  toast(`'${name}' 방을 만들었어요 — 코드: ${room.code}`);
+};
+
+$("btn-admin-close").onclick = ()=>{ $("modal-admin").classList.add("hidden"); loadRoomsList(); };
 $("btn-admin-save").onclick = async ()=>{
   appSettings.app_name = $("admin-app-name").value.trim() || "ON AIR";
   appSettings.tagline = $("admin-tagline").value.trim();
@@ -1203,6 +1236,7 @@ $("btn-admin-save").onclick = async ()=>{
   if(ok === false) return;
   applyBranding();
   $("modal-admin").classList.add("hidden");
+  loadRoomsList();
   toast("관리자 설정을 저장했어요" + (MODE === "cloud" ? " (모든 사용자에게 적용)" : ""));
 };
 
@@ -1278,6 +1312,7 @@ async function loadRoomsList(){
   const uid = currentUser() ? currentUser().nickname : null;
   rooms.forEach(room=>{
     const isMine = roomsTab === "mine" || (room.owner && uid && room.owner === uid);
+    const canDelete = isMine || state.isAdmin;
     const card = document.createElement("div");
     card.className = "room-card" + (isMine ? " mine" : "");
     card.innerHTML = `
@@ -1292,10 +1327,10 @@ async function loadRoomsList(){
       </div>
       <div class="rc-actions" onclick="event.stopPropagation()">
         <button class="rc-btn enter">입장</button>
-        ${isMine ? '<button class="rc-btn del">삭제</button>' : ""}
+        ${canDelete ? '<button class="rc-btn del">삭제</button>' : ""}
       </div>`;
     card.querySelector(".rc-btn.enter").onclick = (e)=>{ e.stopPropagation(); tryEnterRoom(room); };
-    if(isMine){
+    if(canDelete){
       card.querySelector(".rc-btn.del").onclick = async (e)=>{
         e.stopPropagation();
         const btn = e.currentTarget;
@@ -2204,37 +2239,4 @@ applyFontPt();
 $("btn-font").onclick = ()=>$("modal-font").classList.remove("hidden");
 $("btn-font-close").onclick = ()=>$("modal-font").classList.add("hidden");
 $("btn-pt-up").onclick = ()=>{ fontPt += 1; applyFontPt(); };
-$("btn-pt-down").onclick = ()=>{ fontPt -= 1; applyFontPt(); };
-
-/* ---------------- 공유 / 설정 ---------------- */
-$("btn-share").onclick = async ()=>{
-  if(MODE === "demo"){
-    toast("로컬 모드에서는 같은 브라우저의 다른 탭에서 코드 " + state.room.code + "로 입장할 수 있어요");
-    return;
-  }
-  const url = `${location.origin}${location.pathname}?code=${state.room.code}`;
-  const text = `[${state.room.name}] 라이브 악보 입장\n코드: ${state.room.code}\n${url}`;
-  if(navigator.share){
-    navigator.share({ title:"라이브 악보", text, url }).catch(()=>{});
-  }else{
-    await navigator.clipboard.writeText(text);
-    toast("입장 링크를 복사했어요");
-  }
-};
-
-$("btn-settings").onclick = ()=>{
-  $("preset-text").value = (state.room.presets || DEFAULT_PRESETS).join("\n");
-  $("modal-settings").classList.remove("hidden");
-};
-$("btn-settings-cancel").onclick = ()=>$("modal-settings").classList.add("hidden");
-$("btn-save-presets").onclick = async ()=>{
-  const presets = $("preset-text").value.split("\n").map(s=>s.trim()).filter(Boolean).slice(0, 12);
-  await api.updateRoom(state.room.id, { presets });
-  state.room.presets = presets;
-  buildChips();
-  $("modal-settings").classList.add("hidden");
-  toast("메시지 버튼을 저장했어요");
-};
-</script>
-</body>
-</html>
+$("btn-pt-down").onclick = ()=>{ fontPt -= 1; applyFon
