@@ -1,0 +1,1922 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>동수원 찬양팀 · 라이브 악보</title>
+<meta name="description" content="리더가 넘기면 모두의 악보가 함께 넘어가는 찬양팀 악보 동기화 앱" />
+<meta name="theme-color" content="#101318" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="라이브악보" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root{
+    --bg:#101318;
+    --panel:#1a1f27;
+    --panel-2:#232a35;
+    --line:#2e3642;
+    --ink:#f2ede3;
+    --dim:#8b93a1;
+    --accent:#e8b04b;
+    --accent-deep:#b97f2a;
+    --ok:#7fc97f;
+    --danger:#e36b5c;
+    --radius:14px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Pretendard Variable', Pretendard, -apple-system, sans-serif;
+    overscroll-behavior:none;
+  }
+  button{font-family:inherit; cursor:pointer; border:none;}
+  input,textarea{font-family:inherit;}
+  .hidden{display:none !important;}
+
+  /* ---------- 홈 (랜딩 페이지) ---------- */
+  #screen-home{
+    min-height:100dvh; display:flex; flex-direction:column; align-items:center;
+    padding:0 0 40px; gap:0; font-size:16px; line-height:1.65;
+  }
+  .hero{
+    width:100%; padding:52px 24px 28px; text-align:center;
+    background:
+      radial-gradient(ellipse 80% 55% at 50% 0%, rgba(232,176,75,.14), transparent 70%),
+      var(--bg);
+  }
+  .hero .badge{
+    display:inline-block; font-size:13px; font-weight:700; letter-spacing:.06em;
+    color:var(--accent); border:1px solid rgba(232,176,75,.45);
+    border-radius:99px; padding:6px 14px; margin-bottom:18px;
+  }
+  .hero h1{
+    margin:0; font-size:clamp(38px, 9vw, 56px); font-weight:800; letter-spacing:-0.02em;
+    color:var(--accent);
+    text-shadow:0 0 28px rgba(232,176,75,.3);
+  }
+  .hero .tagline{
+    margin:14px auto 0; max-width:420px; font-size:18px; font-weight:600; color:var(--ink);
+  }
+  .hero .desc{ margin:8px auto 0; max-width:420px; font-size:15px; color:var(--dim); }
+  .hero .cta{
+    margin-top:26px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;
+  }
+  .hero .cta .btn{ min-width:160px; font-size:16px; padding:15px 20px; }
+
+  .section{
+    width:100%; max-width:440px; padding:28px 24px 4px;
+  }
+  .section h2{
+    margin:0 0 16px; font-size:14px; font-weight:700; letter-spacing:.08em;
+    color:var(--dim); text-transform:uppercase;
+  }
+  .feature{
+    display:flex; gap:14px; align-items:flex-start; padding:14px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .feature:last-child{ border-bottom:none; }
+  .feature .ico{
+    flex:none; width:44px; height:44px; border-radius:12px;
+    background:rgba(232,176,75,.12); border:1px solid rgba(232,176,75,.3);
+    display:flex; align-items:center; justify-content:center; font-size:22px;
+  }
+  .feature .tx b{ display:block; font-size:16px; margin-bottom:3px; }
+  .feature .tx span{ font-size:14px; color:var(--dim); }
+
+  .mode-banner{
+    width:calc(100% - 48px); max-width:392px; border-radius:12px; padding:14px 16px;
+    font-size:14px; line-height:1.7; margin-top:24px;
+  }
+  .mode-banner.demo{
+    background:rgba(232,176,75,.1); border:1px solid rgba(232,176,75,.4); color:#f0c878;
+  }
+  .mode-banner.cloud{
+    background:rgba(127,201,127,.08); border:1px solid rgba(127,201,127,.35); color:var(--ok);
+  }
+  .home-card{
+    width:calc(100% - 48px); max-width:392px; background:var(--panel);
+    border:1px solid var(--line); border-radius:var(--radius);
+    padding:22px; display:flex; flex-direction:column; gap:12px; margin-top:14px;
+  }
+  .home-card h3{ margin:0 0 2px; font-size:17px; font-weight:700; }
+  .home-card p{ margin:0; color:var(--dim); font-size:14px; }
+  .field{
+    width:100%; background:var(--panel-2); border:1px solid var(--line);
+    color:var(--ink); border-radius:10px; padding:14px; font-size:17px;
+  }
+  .field::placeholder{ color:#6b7280; }
+  .btn{
+    border-radius:10px; padding:15px; font-size:17px; font-weight:700;
+    background:var(--panel-2); color:var(--ink); border:1px solid var(--line);
+    transition:transform .06s ease;
+  }
+  .btn:active{ transform:scale(.98); }
+  .btn:disabled{ opacity:.5; }
+  .btn.primary{ background:var(--accent); color:#1c1608; border-color:var(--accent-deep); }
+  .btn.ghost{ background:transparent; }
+  .role-row{ display:flex; gap:8px; }
+  .role-row .btn{ flex:1; font-size:15px; padding:12px; }
+  .role-row .btn.selected{ border-color:var(--accent); color:var(--accent); }
+  .install-note{ font-size:14px; color:var(--dim); line-height:1.8; }
+  .install-note b{ color:var(--ink); }
+  .home-foot{ color:#6b7280; font-size:13px; text-align:center; line-height:1.8; margin-top:28px; padding:0 24px; }
+
+  /* ---------- 방(공연) 화면 ---------- */
+  #screen-room{ display:flex; flex-direction:column; height:100dvh; }
+  .topbar{
+    display:flex; align-items:center; gap:8px;
+    padding:10px 12px; background:var(--panel); border-bottom:1px solid var(--line);
+    flex:none;
+  }
+  .topbar .back{ background:none; color:var(--dim); font-size:20px; padding:4px 8px; }
+  .room-info{ flex:1; min-width:0; }
+  .room-info .name{ font-weight:700; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .room-info .meta{ font-size:12px; color:var(--dim); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .live-dot{
+    width:8px; height:8px; border-radius:50%; background:var(--ok);
+    display:inline-block; animation:pulse 1.6s infinite;
+  }
+  .live-dot.off{ background:#5b6270; animation:none; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  .icon-btn{
+    background:var(--panel-2); border:1px solid var(--line); color:var(--ink);
+    border-radius:10px; padding:8px 10px; font-size:13px; font-weight:600;
+  }
+  .icon-btn.on{ border-color:var(--accent); color:var(--accent); }
+
+  /* 악보 무대 */
+  .stage{
+    flex:1; overflow:auto; display:flex; align-items:flex-start;
+    justify-content:center; gap:8px; padding:8px; background:#0b0d11;
+  }
+  .pane{ position:relative; flex:1; max-width:900px; }
+  .stage.duo .pane{ max-width:none; width:calc(50% - 4px); }
+  .pane img{
+    width:100%; display:block; border-radius:6px; background:#fff;
+    user-select:none; -webkit-user-drag:none;
+  }
+  .pane canvas{
+    position:absolute; inset:0; width:100%; height:100%;
+    touch-action:none; border-radius:6px;
+  }
+  .pane .page-tag{
+    position:absolute; top:8px; right:8px; background:rgba(16,19,24,.75);
+    color:var(--ink); font-size:12px; font-weight:600; padding:4px 9px; border-radius:99px;
+  }
+  .stage-empty{
+    color:var(--dim); font-size:14px; text-align:center; align-self:center;
+    line-height:1.7;
+  }
+
+  /* 하단 컨트롤 */
+  .bottombar{
+    flex:none; background:var(--panel); border-top:1px solid var(--line);
+    padding:8px 10px calc(8px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:8px;
+  }
+  .msg-row{
+    display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;
+    scrollbar-width:none;
+  }
+  .msg-row::-webkit-scrollbar{ display:none; }
+  .chip{
+    flex:none; background:var(--panel-2); border:1px solid var(--line);
+    color:var(--ink); border-radius:99px; padding:10px 16px; font-size:15px; font-weight:600;
+  }
+  .nav-row{ display:flex; gap:8px; align-items:center; }
+  .nav-row .btn{ padding:12px; font-size:15px; }
+  .nav-row .page-btn{ flex:1; font-size:22px; font-weight:800; }
+  .nav-row .center{
+    flex:none; min-width:110px; text-align:center; font-size:14px; color:var(--dim);
+    line-height:1.4;
+  }
+  .nav-row .center b{ color:var(--ink); font-size:16px; display:block; max-width:150px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:0 auto; }
+  .tool-row{ display:flex; gap:6px; }
+  .tool-row .icon-btn{ flex:1; text-align:center; padding:10px 4px; font-size:13px; }
+
+  /* 메시지 플래시 (시그니처) */
+  #flash{
+    position:fixed; top:0; left:0; right:0; z-index:60;
+    transform:translateY(-110%); transition:transform .25s ease;
+    background:linear-gradient(180deg, rgba(232,176,75,.98), rgba(185,127,42,.96));
+    color:#1c1608; text-align:center; font-weight:800;
+    padding:calc(18px + env(safe-area-inset-top)) 16px 20px;
+    font-size:clamp(28px, 7vw, 52px); letter-spacing:-0.01em;
+    box-shadow:0 8px 40px rgba(232,176,75,.35);
+  }
+  #flash.show{ transform:translateY(0); }
+  #flash .from{ display:block; font-size:13px; font-weight:600; opacity:.75; margin-top:4px; }
+
+  /* 콘티 서랍 */
+  .drawer-veil{
+    position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:40;
+    opacity:0; pointer-events:none; transition:opacity .2s;
+  }
+  .drawer-veil.show{ opacity:1; pointer-events:auto; }
+  .drawer{
+    position:fixed; left:0; right:0; bottom:0; z-index:50;
+    background:var(--panel); border-radius:18px 18px 0 0;
+    border:1px solid var(--line); border-bottom:none;
+    max-height:75dvh; display:flex; flex-direction:column;
+    transform:translateY(105%); transition:transform .25s ease;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .drawer.show{ transform:translateY(0); }
+  .drawer-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 16px 10px;
+  }
+  .drawer-head h3{ margin:0; font-size:16px; }
+  .drawer-body{ overflow-y:auto; padding:0 12px 16px; display:flex; flex-direction:column; gap:8px; }
+  .song-item{
+    display:flex; align-items:center; gap:8px; background:var(--panel-2);
+    border:1px solid var(--line); border-radius:12px; padding:12px;
+  }
+  .song-item.current{ border-color:var(--accent); }
+  .song-item .t{ flex:1; min-width:0; font-weight:600; font-size:15px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .song-item .t small{ display:block; color:var(--dim); font-weight:400; font-size:12px; }
+  .song-item .mini{
+    background:var(--panel); border:1px solid var(--line); color:var(--dim);
+    border-radius:8px; padding:7px 9px; font-size:13px;
+  }
+
+  /* 모달 */
+  .modal-veil{
+    position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:70;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal{
+    width:100%; max-width:360px; background:var(--panel); border:1px solid var(--line);
+    border-radius:var(--radius); padding:20px; display:flex; flex-direction:column; gap:12px;
+  }
+  .modal h3{ margin:0; font-size:16px; }
+  .modal .note{ color:var(--dim); font-size:12px; line-height:1.5; margin:0; }
+  textarea.field{ min-height:120px; resize:vertical; font-size:14px; }
+
+  /* 토스트 */
+  #toast{
+    position:fixed; bottom:110px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:rgba(35,42,53,.97); border:1px solid var(--line); color:var(--ink);
+    padding:11px 18px; border-radius:16px; font-size:14px; line-height:1.55; z-index:80;
+    opacity:0; transition:all .25s; pointer-events:none;
+    max-width:min(88vw, 420px); text-align:center;
+  }
+  #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* ---------- 테마 ---------- */
+  :root[data-theme="light"]{
+    --bg:#f4f1e9; --panel:#ffffff; --panel-2:#efece3; --line:#ddd6c8;
+    --ink:#22262e; --dim:#6b7280; --accent:#b97f2a; --accent-deep:#96650f;
+  }
+  :root[data-theme="blue"]{
+    --bg:#0c1424; --panel:#152238; --panel-2:#1d2f4d; --line:#2b4066;
+    --ink:#e9eef7; --dim:#8fa1bd; --accent:#5ea0ff; --accent-deep:#3577d6;
+  }
+  :root[data-theme="light"] .stage{ background:#e7e2d5; }
+  :root[data-theme="blue"] .stage{ background:#080e1a; }
+  :root[data-theme="light"] .hero{ background:radial-gradient(ellipse 80% 55% at 50% 0%, rgba(185,127,42,.14), transparent 70%), var(--bg); }
+  .stage.invert img{ filter:invert(0.93) hue-rotate(180deg); }
+
+  .theme-opt{ display:flex; gap:8px; }
+  .theme-opt .btn{ flex:1; font-size:14px; padding:12px 4px; }
+  .theme-opt .btn.sel{ border-color:var(--accent); color:var(--accent); }
+  .swatch-row{ display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  .swatch{ width:46px; height:46px; border-radius:50%; border:3px solid var(--line); }
+  .swatch.sel{ border-color:var(--ink); box-shadow:0 0 0 3px var(--accent); }
+  .size-row{ display:flex; gap:8px; }
+  .size-row .btn{ flex:1; font-size:14px; }
+  .size-row .btn.sel{ border-color:var(--accent); color:var(--accent); }
+  .toggle-row{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:12px 14px; font-size:15px; }
+
+  /* 대기 화면 (블랙아웃) */
+  #blackout{ position:fixed; inset:0; background:#000; z-index:90; display:none;
+    flex-direction:column; align-items:center; justify-content:center; gap:12px; text-align:center; padding:20px; }
+  #blackout.show{ display:flex; }
+  #blackout .bo-clock{ font-size:clamp(48px,14vw,84px); font-weight:800; color:#f2ede3;
+    letter-spacing:.04em; font-variant-numeric:tabular-nums; }
+  #blackout .bo-title{ font-size:20px; font-weight:700; color:#e8b04b; }
+  #blackout .bo-sub{ color:#8b93a1; font-size:14px; }
+
+  .clock{ font-variant-numeric:tabular-nums; }
+  .admin-list{ display:flex; flex-direction:column; gap:8px; max-height:180px; overflow:auto; }
+  .admin-list .row{ display:flex; align-items:center; gap:8px; background:var(--panel-2);
+    border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:14px; }
+  .admin-list .row .grow{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .link-btn{ background:none; color:var(--dim); font-size:13px; text-decoration:underline; padding:4px; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation:none !important; transition:none !important; }
+  }
+
+  /* ---------- 글자 크기(pt) 조절: 악보는 그대로, UI만 확대 ---------- */
+  .topbar, .bottombar, .drawer, .modal, #flash, #toast, .note-bar{
+    zoom: var(--ui-zoom, 1);
+  }
+  .pt-row{ display:flex; align-items:center; justify-content:center; gap:14px; }
+  .pt-row .btn{ flex:none; width:64px; font-size:22px; padding:10px; }
+  .pt-row .pt-val{ min-width:80px; text-align:center; font-size:22px; font-weight:800; color:var(--accent); }
+
+  /* ---------- 곡 멘트 바 ---------- */
+  .note-bar{
+    flex:none; background:rgba(232,176,75,.12); border-bottom:1px solid rgba(232,176,75,.3);
+    color:#f0c878; padding:9px 14px; font-size:15px; font-weight:600; line-height:1.5;
+  }
+  .song-item .t .memo{ display:block; color:#d9a94f; font-weight:500; font-size:12px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tool-row .icon-btn{ font-size:12.5px; padding:10px 2px; }
+  .chip.accent{ border-color:var(--accent-deep); color:var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- ============ 홈 (랜딩) ============ -->
+<div id="screen-home">
+
+  <div class="hero">
+    <div class="badge" id="brand-badge">WORSHIP TEAM LIVE</div>
+    <h1 id="brand-title">ON AIR</h1>
+    <p class="tagline" id="brand-tagline">무대 위의 모든 악보를, 하나의 호흡으로</p>
+    <div class="cta">
+      <button class="btn" id="btn-theme-home">🎨 테마</button>
+      <button class="btn hidden" id="btn-install">📲 앱 설치</button>
+    </div>
+  </div>
+
+  <div class="mode-banner cloud hidden" id="mode-banner"></div>
+
+  <div class="home-card" id="start-anchor" style="margin-top:8px">
+    <h3>방 만들기</h3>
+    <input id="create-name" class="field" placeholder="방 이름 (예: 주일 3부 찬양팀)" maxlength="20" />
+    <button class="btn primary" id="btn-create">리더로 시작</button>
+  </div>
+
+  <div class="home-card">
+    <h3>코드로 입장</h3>
+    <input id="join-code" class="field" placeholder="입장 코드 (6자리)" maxlength="6" autocapitalize="characters" style="text-transform:uppercase" />
+    <input id="join-name" class="field" placeholder="내 이름" maxlength="10" />
+    <div class="role-row">
+      <button class="btn selected" data-role="member" id="role-member">팀원</button>
+      <button class="btn" data-role="accomp" id="role-accomp">반주자</button>
+    </div>
+    <button class="btn primary" id="btn-join">입장하기</button>
+  </div>
+
+  <div class="home-card" id="account-card">
+    <button class="btn" id="btn-auth-open">로그인 · 회원가입</button>
+    <button class="btn ghost hidden" id="btn-logout">로그아웃</button>
+    <p id="account-desc" style="text-align:center"></p>
+  </div>
+
+  <div class="home-foot" id="home-foot">
+    <span id="install-note"></span>
+    <button class="link-btn" id="btn-admin-open">관리자</button>
+  </div>
+</div>
+
+<!-- ============ 방 ============ -->
+<div id="screen-room" class="hidden">
+  <div class="topbar">
+    <button class="back" id="btn-back">←</button>
+    <div class="room-info">
+      <div class="name" id="room-name">방 이름</div>
+      <div class="meta">
+        <span><span class="live-dot off" id="live-dot"></span> <span id="live-label">연결 중</span></span>
+        <span id="presence-count"></span>
+        <span id="room-code-label"></span>
+        <span class="clock" id="topbar-clock"></span>
+      </div>
+    </div>
+    <button class="icon-btn hidden" id="btn-free">🔓 자유</button>
+    <button class="icon-btn" id="btn-theme-room">🎨</button>
+    <button class="icon-btn" id="btn-font">가</button>
+    <button class="icon-btn hidden" id="btn-duo">2쪽</button>
+    <button class="icon-btn hidden" id="btn-share">공유</button>
+    <button class="icon-btn hidden" id="btn-settings">설정</button>
+  </div>
+
+  <div class="note-bar hidden" id="note-bar"></div>
+
+  <div class="stage" id="stage"></div>
+
+  <div class="bottombar" id="bottombar">
+    <div class="msg-row hidden" id="msg-row"></div>
+    <div class="nav-row hidden" id="nav-row">
+      <button class="btn page-btn" id="btn-prev">◀</button>
+      <div class="center">
+        <b id="song-title">-</b>
+        <span id="page-label">- / -</span>
+      </div>
+      <button class="btn page-btn" id="btn-next">▶</button>
+    </div>
+    <div class="tool-row hidden" id="tool-row">
+      <button class="icon-btn" id="btn-setlist">콘티</button>
+      <button class="icon-btn" id="btn-draw">✏️ 그리기</button>
+      <button class="icon-btn" id="btn-solo">⭐ 솔로</button>
+      <button class="icon-btn" id="btn-undo">↩ 되돌리기</button>
+      <button class="icon-btn" id="btn-erase">지우기</button>
+      <button class="icon-btn" id="btn-note">📝 멘트</button>
+    </div>
+  </div>
+</div>
+
+<!-- 메시지 플래시 -->
+<div id="flash"><span id="flash-text"></span><span class="from" id="flash-from"></span></div>
+
+<!-- 콘티 서랍 -->
+<div class="drawer-veil" id="drawer-veil"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h3>콘티 (곡 순서)</h3>
+    <button class="icon-btn" id="btn-add-song">+ 곡 추가</button>
+  </div>
+  <div class="drawer-body" id="setlist"></div>
+</div>
+
+<!-- 곡 추가 모달 -->
+<div class="modal-veil hidden" id="modal-add">
+  <div class="modal">
+    <h3>곡 추가</h3>
+    <input id="add-title" class="field" placeholder="곡 제목" maxlength="40" />
+    <input id="add-files" class="field" type="file" accept="image/*,.pdf,application/pdf" multiple />
+    <p class="note">악보 <b>사진/이미지 또는 PDF</b>를 선택하세요. PDF는 페이지별로 자동 변환되고, 이미지는 페이지 순서대로 올라갑니다. 용량도 자동으로 줄여줘요.</p>
+    <button class="btn primary" id="btn-upload">올리기</button>
+    <button class="btn ghost" id="btn-add-cancel">취소</button>
+  </div>
+</div>
+
+<!-- 설정 모달 (프리셋 메시지 편집) -->
+<div class="modal-veil hidden" id="modal-settings">
+  <div class="modal">
+    <h3>메시지 버튼 편집</h3>
+    <p class="note">한 줄에 하나씩 적으면 하단 버튼이 됩니다. 우리 팀이 자주 쓰는 사인으로 바꿔보세요.</p>
+    <textarea id="preset-text" class="field"></textarea>
+    <button class="btn primary" id="btn-save-presets">저장</button>
+    <button class="btn danger" id="btn-erase-all">🧹 모든 곡의 펜·솔로 표시 전체 지우기</button>
+    <button class="btn ghost" id="btn-settings-cancel">취소</button>
+  </div>
+</div>
+
+<!-- 글자 크기 모달 -->
+<div class="modal-veil hidden" id="modal-font">
+  <div class="modal">
+    <h3>글자 크기</h3>
+    <div class="pt-row">
+      <button class="btn" id="btn-pt-down">−</button>
+      <div class="pt-val" id="pt-val">12pt</div>
+      <button class="btn" id="btn-pt-up">＋</button>
+    </div>
+    <p class="note">버튼과 글씨가 커집니다. 악보 크기는 그대로 유지돼요. 이 설정은 내 기기에만 적용됩니다.</p>
+    <button class="btn primary" id="btn-font-close">닫기</button>
+  </div>
+</div>
+
+<!-- 솔로 이름 입력 모달 -->
+<div class="modal-veil hidden" id="modal-solo">
+  <div class="modal">
+    <h3>⭐ 솔로 파트 지정</h3>
+    <input id="solo-name" class="field" placeholder="담당자 이름 (예: 은혜)" maxlength="10" />
+    <button class="btn primary" id="btn-solo-ok">지정하기</button>
+    <button class="btn ghost" id="btn-solo-cancel">취소</button>
+  </div>
+</div>
+
+<!-- 곡 멘트 모달 -->
+<div class="modal-veil hidden" id="modal-note">
+  <div class="modal">
+    <h3>📝 곡 멘트</h3>
+    <p class="note" id="note-song-label"></p>
+    <textarea id="note-text" class="field" placeholder="예: 1절 잔잔하게 시작 → 간주 후 다같이&#10;마지막 후렴 반키 올림" maxlength="300"></textarea>
+    <p class="note">이 곡이 화면에 나올 때 악보 위쪽에 노란 띠로 전 팀원에게 표시됩니다.</p>
+    <button class="btn primary" id="btn-note-save">저장</button>
+    <button class="btn ghost" id="btn-note-cancel">취소</button>
+  </div>
+</div>
+
+<!-- 직접 메시지 모달 -->
+<div class="modal-veil hidden" id="modal-msg">
+  <div class="modal">
+    <h3>✍ 직접 메시지 보내기</h3>
+    <input id="custom-msg-text" class="field" placeholder="팀원 화면에 크게 띄울 문구" maxlength="30" />
+    <button class="btn primary" id="btn-msg-send">보내기</button>
+    <button class="btn ghost" id="btn-msg-cancel">취소</button>
+  </div>
+</div>
+
+<!-- 테마 모달 -->
+<div class="modal-veil hidden" id="modal-theme">
+  <div class="modal">
+    <h3>🎨 화면 테마</h3>
+    <div class="theme-opt">
+      <button class="btn" data-theme-val="dark" id="theme-dark">무대 다크</button>
+      <button class="btn" data-theme-val="light" id="theme-light">라이트</button>
+      <button class="btn" data-theme-val="blue" id="theme-blue">미드나잇</button>
+    </div>
+    <div class="toggle-row">
+      <span>🌙 야간 악보 반전<br/><small style="color:var(--dim)">어두운 무대에서 악보를 검은 배경·흰 음표로</small></span>
+      <button class="icon-btn" id="btn-invert">끔</button>
+    </div>
+    <p class="note">테마는 내 기기에만 적용됩니다.</p>
+    <button class="btn primary" id="btn-theme-close">닫기</button>
+  </div>
+</div>
+
+<!-- 펜 설정 모달 -->
+<div class="modal-veil hidden" id="modal-pen">
+  <div class="modal">
+    <h3>✏️ 펜 설정</h3>
+    <p class="note">색상</p>
+    <div class="swatch-row" id="pen-colors"></div>
+    <p class="note">굵기</p>
+    <div class="size-row" id="pen-sizes"></div>
+    <button class="btn primary" id="btn-pen-start">이 펜으로 그리기</button>
+    <button class="btn ghost" id="btn-pen-cancel">취소</button>
+  </div>
+</div>
+
+<!-- 회원 모달 -->
+<div class="modal-veil hidden" id="modal-auth">
+  <div class="modal">
+    <h3 id="auth-title">회원가입</h3>
+    <div class="role-row">
+      <button class="btn selected" id="auth-tab-signup">회원가입</button>
+      <button class="btn" id="auth-tab-login">로그인</button>
+    </div>
+    <input id="auth-name" class="field" placeholder="이름" maxlength="10" />
+    <input id="auth-nick" class="field" placeholder="별명 (영문·숫자, 로그인 아이디)" maxlength="12" />
+    <input id="auth-pass" class="field" type="password" placeholder="비밀번호 (6자 이상)" maxlength="40" />
+    <button class="btn primary" id="btn-auth-submit">가입하기</button>
+    <button class="btn ghost" id="btn-auth-cancel">취소</button>
+  </div>
+</div>
+
+<!-- 관리자 PIN 모달 -->
+<div class="modal-veil hidden" id="modal-admin-pin">
+  <div class="modal">
+    <h3>🔑 관리자 확인</h3>
+    <input id="admin-pin" class="field" type="password" placeholder="관리자 PIN" maxlength="8" inputmode="numeric" />
+    <button class="btn primary" id="btn-admin-pin-ok">확인</button>
+    <button class="btn ghost" id="btn-admin-pin-cancel">취소</button>
+  </div>
+</div>
+
+<!-- 관리자 패널 -->
+<div class="modal-veil hidden" id="modal-admin">
+  <div class="modal">
+    <h3>🛠 관리자 패널</h3>
+    <p class="note">서비스 이름·문구</p>
+    <input id="admin-app-name" class="field" placeholder="서비스 이름 (예: ON AIR)" maxlength="20" />
+    <input id="admin-tagline" class="field" placeholder="한 줄 소개" maxlength="40" />
+    <p class="note">새 방의 기본 메시지 버튼 (한 줄에 하나)</p>
+    <textarea id="admin-presets" class="field" style="min-height:90px"></textarea>
+    <p class="note">기본 테마</p>
+    <div class="theme-opt">
+      <button class="btn" data-adm-theme="dark">다크</button>
+      <button class="btn" data-adm-theme="light">라이트</button>
+      <button class="btn" data-adm-theme="blue">미드나잇</button>
+    </div>
+    <p class="note">방 관리</p>
+    <div class="admin-list" id="admin-rooms"></div>
+    <button class="btn primary" id="btn-admin-save">저장</button>
+    <button class="btn ghost" id="btn-admin-close">닫기</button>
+  </div>
+</div>
+
+<!-- 대기 화면 (블랙아웃) -->
+<div id="blackout">
+  <div class="bo-clock" id="bo-clock">--:--</div>
+  <div class="bo-title" id="bo-title">잠시 준비 중입니다</div>
+  <div class="bo-sub" id="bo-sub"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   ⚙️ 설정
+   1) 팀 전체 실시간 동기화: 아래 두 줄에 Supabase 값 입력
+      (비워두면 이 기기 안에서만 동작하는 '로컬 모드')
+   2) ADMIN_PIN: 관리자 비밀번호 — 꼭 바꿔서 쓰세요!
+   ============================================================ */
+const SUPABASE_URL = "";
+const SUPABASE_ANON_KEY = "";
+const ADMIN_PIN = "0000";
+
+const CONFIGURED = /supabase\.co/.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 30;
+const MODE = CONFIGURED ? "cloud" : "demo";
+
+const $ = (id) => document.getElementById(id);
+let sb = null;
+let channel = null;   // { send(event,payload), close() }
+let wakeLock = null;
+
+const state = {
+  room: null, songs: [], songIdx: 0, page: 0,
+  role: "member", myName: "", duo: false, tool: null,
+  ann: {},   // { "songId:page": { strokes:[], badges:[] } }
+};
+
+/* ---------------- 공통 유틸 ---------------- */
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._tm);
+  t._tm = setTimeout(()=>t.classList.remove("show"), Math.max(2400, msg.length * 75));
+}
+function getAnn(key){
+  if(!state.ann[key]) state.ann[key] = { strokes:[], badges:[], order:[] };
+  if(!state.ann[key].order) state.ann[key].order = [];
+  return state.ann[key];
+}
+function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : "id-" + Math.random().toString(36).slice(2)); }
+// 방 코드: 0/O/1/I/L 등 헷갈리는 문자를 뺀 6자리 (추측·오입력 방지)
+function genRoomCode(){
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let s = "";
+  const rnd = (crypto.getRandomValues) ? crypto.getRandomValues(new Uint32Array(6)) : null;
+  for(let i=0;i<6;i++){
+    const r = rnd ? rnd[i] % chars.length : Math.floor(Math.random()*chars.length);
+    s += chars[r];
+  }
+  return s;
+}
+const DEFAULT_PRESETS = ["조금 느리게","다음 곡 준비","마무리","작게","크게","한 번 더"];
+
+/* ============================================================
+   백엔드 1) 로컬 모드 - localStorage + BroadcastChannel
+   (같은 브라우저의 다른 탭과 실시간 동기화됩니다)
+   ============================================================ */
+const demo = {
+  load(){ try{ return JSON.parse(localStorage.getItem("praise_demo") || "{}"); }catch(e){ return {}; } },
+  save(db){
+    try{ localStorage.setItem("praise_demo", JSON.stringify(db)); return true; }
+    catch(e){ toast("로컬 저장 공간이 가득 찼어요. 곡을 지워주세요."); return false; }
+  },
+  async createRoom(name, code){
+    const db = this.load(); db.rooms = db.rooms || {}; db.songs = db.songs || {};
+    code = code || genRoomCode();
+    const presets = (appSettings.default_presets && appSettings.default_presets.length) ? appSettings.default_presets.slice() : [...DEFAULT_PRESETS];
+    const room = { id:"room-"+code, code, name, current_song:0, current_page:0, presets };
+    db.rooms[code] = room; db.songs[room.id] = db.songs[room.id] || [];
+    this.save(db); return room;
+  },
+  async findRoom(code){ return (this.load().rooms || {})[code] || null; },
+  async updateRoom(id, patch){
+    const db = this.load();
+    for(const c in (db.rooms||{})) if(db.rooms[c].id === id) Object.assign(db.rooms[c], patch);
+    this.save(db);
+  },
+  async listSongs(roomId){
+    return ((this.load().songs || {})[roomId] || []).slice().sort((a,b)=>a.sort-b.sort);
+  },
+  async insertSong(song){
+    const db = this.load(); db.songs = db.songs || {};
+    (db.songs[song.room_id] = db.songs[song.room_id] || []).push(song);
+    return this.save(db);
+  },
+  async deleteSong(roomId, songId){
+    const db = this.load();
+    db.songs[roomId] = (db.songs[roomId] || []).filter(s=>s.id !== songId);
+    this.save(db);
+  },
+  async setSort(roomId, songId, sort){
+    const db = this.load();
+    const s = (db.songs[roomId] || []).find(s=>s.id === songId);
+    if(s) s.sort = sort;
+    this.save(db);
+  },
+  async updateSongNote(roomId, songId, note){
+    const db = this.load();
+    const s = (db.songs[roomId] || []).find(s=>s.id === songId);
+    if(s) s.note = note;
+    return this.save(db);
+  },
+  async getSettings(){ try{ return JSON.parse(localStorage.getItem("praise_settings")) || null; }catch(e){ return null; } },
+  async saveSettings(d){ localStorage.setItem("praise_settings", JSON.stringify(d)); return true; },
+  async signup(name, nickname, password){
+    const users = JSON.parse(localStorage.getItem("praise_users") || "[]");
+    if(users.some(u=>u.nickname === nickname)){ toast("이미 사용 중인 별명이에요"); return null; }
+    const hash = await hashPass(password);
+    users.push({ name, nickname, hash });
+    localStorage.setItem("praise_users", JSON.stringify(users));
+    return { name, nickname };
+  },
+  async login(nickname, password){
+    const users = JSON.parse(localStorage.getItem("praise_users") || "[]");
+    const hash = await hashPass(password);
+    const u = users.find(u=>u.nickname === nickname && u.hash === hash);
+    return u ? { name: u.name, nickname: u.nickname } : null;
+  },
+  async logout(){},
+  async adminListRooms(){
+    const db = this.load();
+    return Object.values(db.rooms || {});
+  },
+  async adminDeleteRoom(id){
+    const db = this.load();
+    for(const c in (db.rooms||{})) if(db.rooms[c].id === id) delete db.rooms[c];
+    if(db.songs) delete db.songs[id];
+    this.save(db);
+  },
+  async uploadPage(roomId, songId, i, blob){
+    return await new Promise(res=>{
+      const r = new FileReader(); r.onload = ()=>res(r.result); r.readAsDataURL(blob);
+    });
+  },
+  openChannel(roomId, onEvent, onStatus){
+    const bc = new BroadcastChannel("praise-" + roomId);
+    bc.onmessage = (e)=>onEvent(e.data.event, e.data.payload);
+    setTimeout(()=>onStatus(true), 100);
+    return { send:(event,payload)=>bc.postMessage({event,payload}), close:()=>bc.close() };
+  },
+};
+
+/* ============================================================
+   백엔드 2) 팀 모드 - Supabase (모든 기기 실시간 동기화)
+   ============================================================ */
+const cloud = {
+  // 비회원도 실시간 참여는 가능해야 하므로, 로그인 안 했으면 익명 세션 유지
+  async ensureAuth(){
+    const { data } = await sb.auth.getSession();
+    if(data.session) return true;
+    const { error } = await sb.auth.signInAnonymously();
+    if(error){
+      alert("연결에 실패했어요.\n\nSupabase 대시보드에서\nAuthentication → Providers → Anonymous 를 켜주세요.\n\n(" + error.message + ")");
+      return false;
+    }
+    return true;
+  },
+  async currentUid(){
+    const { data } = await sb.auth.getUser();
+    return data.user ? data.user.id : null;
+  },
+  async createRoom(name){
+    if(!await this.ensureAuth()) return null;
+    const uid = await this.currentUid();
+    const presets = (appSettings.default_presets && appSettings.default_presets.length) ? appSettings.default_presets : DEFAULT_PRESETS;
+    let data = null, lastErr = null;
+    for(let attempt = 0; attempt < 6; attempt++){
+      const code = genRoomCode();
+      const res = await sb.from("praise_rooms").insert({ code, name, presets, owner: uid }).select().single();
+      if(!res.error){ data = res.data; break; }
+      lastErr = res.error;
+      if(res.error.code !== "23505") break;   // 중복이 아니면 즉시 중단
+    }
+    if(!data){ alert("방 생성 실패: " + (lastErr && lastErr.message) + "\n\n보안강화.sql을 SQL Editor에서 실행했는지 확인해주세요."); return null; }
+    return data;
+  },
+  async findRoom(code){
+    if(!await this.ensureAuth()) return null;
+    const { data } = await sb.from("praise_rooms").select().eq("code", code).maybeSingle();
+    return data;
+  },
+  async updateRoom(id, patch){ await sb.from("praise_rooms").update(patch).eq("id", id); },
+  async listSongs(roomId){
+    const { data } = await sb.from("praise_songs").select()
+      .eq("room_id", roomId).order("sort").order("created_at");
+    return data || [];
+  },
+  async insertSong(song){
+    const { error } = await sb.from("praise_songs").insert(song);
+    if(error){ toast(rlsHint(error, "곡 저장")); return false; }
+    return true;
+  },
+  async deleteSong(roomId, songId){ await sb.from("praise_songs").delete().eq("id", songId); },
+  async setSort(roomId, songId, sort){ await sb.from("praise_songs").update({ sort }).eq("id", songId); },
+  async updateSongNote(roomId, songId, note){
+    const { error } = await sb.from("praise_songs").update({ note }).eq("id", songId);
+    if(error){ toast(rlsHint(error, "멘트 저장")); return false; }
+    return true;
+  },
+  async getSettings(){
+    try{
+      const { data } = await sb.from("praise_settings").select().eq("id", 1).maybeSingle();
+      return (data && data.data) || null;
+    }catch(e){ return null; }
+  },
+  async saveSettings(d){
+    const { error } = await sb.from("praise_settings").upsert({ id:1, data: d });
+    if(error){ toast(rlsHint(error, "설정 저장")); return false; }
+    return true;
+  },
+  // ── 회원: Supabase Auth (별명 → 내부 이메일로 변환, 사용자는 별명만 입력) ──
+  nickToEmail(nick){ return "u_" + nick.toLowerCase().replace(/[^a-z0-9_]/g,"") + "@onair.local"; },
+  async signup(name, nickname, password){
+    const email = this.nickToEmail(nickname);
+    const { data, error } = await sb.auth.signUp({
+      email, password,
+      options: { data: { display_name: name, nickname } }
+    });
+    if(error){
+      if(/registered|exists/i.test(error.message)) toast("이미 사용 중인 별명이에요");
+      else toast("가입 실패: " + error.message);
+      return null;
+    }
+    // 프로필 테이블에도 기록 (표시용)
+    if(data.user){
+      await sb.from("praise_profiles").upsert({ id: data.user.id, name, nickname }).select();
+    }
+    return { name, nickname };
+  },
+  async login(nickname, password){
+    const email = this.nickToEmail(nickname);
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if(error){ toast("별명 또는 비밀번호가 맞지 않아요"); return null; }
+    const meta = data.user.user_metadata || {};
+    return { name: meta.display_name || nickname, nickname: meta.nickname || nickname };
+  },
+  async logout(){ await sb.auth.signOut(); await this.ensureAuth(); },
+  async adminListRooms(){
+    const { data } = await sb.from("praise_rooms").select("id,code,name").order("created_at", { ascending:false });
+    return data || [];
+  },
+  async adminDeleteRoom(id){ await sb.from("praise_rooms").delete().eq("id", id); },
+  async uploadPage(roomId, songId, i, blob){
+    const path = `${roomId}/${songId}/p${i}.jpg`;
+    const { error } = await sb.storage.from("praise-sheets").upload(path, blob, { contentType:"image/jpeg" });
+    if(error) throw error;
+    return sb.storage.from("praise-sheets").getPublicUrl(path).data.publicUrl;
+  },
+  openChannel(roomId, onEvent, onStatus){
+    const ch = sb.channel("praise-" + roomId, {
+      config: { broadcast: { self:false }, presence: { key: state.myName + "-" + Math.random().toString(36).slice(2,6) } }
+    });
+    ["page","msg","stroke","badge","erase","undo","eraseAll","badgeMove","blackout","songs","hello","state"].forEach(ev=>{
+      ch.on("broadcast", { event: ev }, ({ payload }) => onEvent(ev, payload));
+    });
+    ch.on("presence", { event:"sync" }, ()=>{
+      $("presence-count").textContent = Object.keys(ch.presenceState()).length + "명 접속";
+    });
+    ch.subscribe(async (status)=>{
+      const ok = status === "SUBSCRIBED";
+      onStatus(ok);
+      if(ok) await ch.track({ name: state.myName, role: state.role });
+    });
+    return { send:(event,payload)=>ch.send({ type:"broadcast", event, payload }), close:()=>sb.removeChannel(ch) };
+  },
+};
+
+function rlsHint(error, what){
+  if(error && (error.code === "42501" || /row-level|policy|permission/i.test(error.message||"")))
+    return `${what} 권한이 없어요. 이 방의 리더만 수정할 수 있습니다`;
+  return `${what} 실패: ${error.message || error}`;
+}
+
+const api = MODE === "cloud" ? cloud : demo;
+
+/* ---------------- 시작 ---------------- */
+let appSettings = {};   // 관리자 설정 (서비스 이름, 기본 프리셋, 기본 테마)
+
+async function init(){
+  if(MODE === "cloud"){
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  const p = new URLSearchParams(location.search);
+  if(p.get("code")) $("join-code").value = p.get("code");
+
+  appSettings = (await api.getSettings()) || {};
+  applyBranding();
+  applyTheme(localStorage.getItem("praise_theme") || appSettings.default_theme || "dark");
+  refreshAccountUI();
+  startClock();
+  initPWA();
+}
+
+function applyBranding(){
+  const name = appSettings.app_name || "ON AIR";
+  const tag = appSettings.tagline || "무대 위의 모든 악보를, 하나의 호흡으로";
+  $("brand-title").textContent = name;
+  $("brand-tagline").textContent = tag;
+  document.title = name + " · 라이브 악보";
+  $("bo-sub").textContent = name;
+}
+
+/* ---------------- 테마 ---------------- */
+function applyTheme(t){
+  if(t === "dark") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", t);
+  localStorage.setItem("praise_theme", t);
+  document.querySelectorAll("[data-theme-val]").forEach(b=>
+    b.classList.toggle("sel", b.dataset.themeVal === t));
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.content = getComputedStyle(document.body).backgroundColor;
+}
+document.querySelectorAll("[data-theme-val]").forEach(b=>{
+  b.onclick = ()=>applyTheme(b.dataset.themeVal);
+});
+$("btn-theme-home").onclick = ()=>$("modal-theme").classList.remove("hidden");
+$("btn-theme-room").onclick = ()=>$("modal-theme").classList.remove("hidden");
+$("btn-theme-close").onclick = ()=>$("modal-theme").classList.add("hidden");
+
+// 🌙 야간 악보 반전
+let sheetInvert = localStorage.getItem("praise_invert") === "1";
+function applyInvert(){
+  $("btn-invert").textContent = sheetInvert ? "켬" : "끔";
+  $("btn-invert").classList.toggle("on", sheetInvert);
+  $("stage").classList.toggle("invert", sheetInvert);
+  localStorage.setItem("praise_invert", sheetInvert ? "1" : "0");
+}
+$("btn-invert").onclick = ()=>{ sheetInvert = !sheetInvert; applyInvert(); };
+applyInvert();
+
+/* ---------------- 시계 ---------------- */
+function startClock(){
+  const tick = ()=>{
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2,"0"), mm = String(d.getMinutes()).padStart(2,"0");
+    $("topbar-clock").textContent = hh + ":" + mm;
+    $("bo-clock").textContent = hh + ":" + mm;
+  };
+  tick(); setInterval(tick, 15000);
+}
+
+/* ---------------- 회원 (이름·별명·비밀번호) ---------------- */
+let authMode = "signup";
+function currentUser(){
+  try{ return JSON.parse(localStorage.getItem("praise_user")) || null; }catch(e){ return null; }
+}
+function refreshAccountUI(){
+  const u = currentUser();
+  if(u){
+    $("account-desc").innerHTML = `<b>${u.name}</b>님 (${u.nickname})`;
+    $("btn-auth-open").classList.add("hidden");
+    $("btn-logout").classList.remove("hidden");
+    $("join-name").value = u.nickname;
+  }else{
+    $("account-desc").textContent = "비회원으로도 바로 이용할 수 있어요";
+    $("btn-auth-open").classList.remove("hidden");
+    $("btn-logout").classList.add("hidden");
+    $("join-name").value = localStorage.getItem("praise_name") || "";
+  }
+}
+async function hashPass(s){
+  try{
+    const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("praise:" + s));
+    return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");
+  }catch(e){
+    let h = 0; for(const ch of s) h = (h*31 + ch.charCodeAt(0)) >>> 0;
+    return "f" + h.toString(16);
+  }
+}
+function setAuthMode(m){
+  authMode = m;
+  $("auth-tab-signup").classList.toggle("selected", m === "signup");
+  $("auth-tab-login").classList.toggle("selected", m === "login");
+  $("auth-title").textContent = m === "signup" ? "회원가입" : "로그인";
+  $("btn-auth-submit").textContent = m === "signup" ? "가입하기" : "로그인";
+  $("auth-name").classList.toggle("hidden", m === "login");
+}
+$("auth-tab-signup").onclick = ()=>setAuthMode("signup");
+$("auth-tab-login").onclick = ()=>setAuthMode("login");
+$("btn-auth-open").onclick = ()=>{ setAuthMode("signup"); $("modal-auth").classList.remove("hidden"); };
+$("btn-auth-cancel").onclick = ()=>$("modal-auth").classList.add("hidden");
+$("btn-logout").onclick = async ()=>{ await api.logout(); localStorage.removeItem("praise_user"); refreshAccountUI(); toast("로그아웃했어요"); };
+
+$("btn-auth-submit").onclick = async ()=>{
+  const name = $("auth-name").value.trim();
+  const nick = $("auth-nick").value.trim();
+  const pass = $("auth-pass").value;
+  if(!nick || !pass) return toast("별명과 비밀번호를 입력하세요");
+  if(!/^[A-Za-z0-9_]{2,12}$/.test(nick)) return toast("별명은 영문·숫자·밑줄 2~12자로 해주세요");
+  if(pass.length < 6) return toast("비밀번호는 6자 이상으로 해주세요");
+  const btn = $("btn-auth-submit"); btn.disabled = true;
+  let u = null;
+  if(authMode === "signup"){
+    if(!name){ btn.disabled = false; return toast("이름을 입력하세요"); }
+    u = await api.signup(name, nick, pass);
+  }else{
+    u = await api.login(nick, pass);
+  }
+  btn.disabled = false;
+  if(!u) return;
+  localStorage.setItem("praise_user", JSON.stringify(u));
+  $("modal-auth").classList.add("hidden");
+  refreshAccountUI();
+  toast(authMode === "signup" ? `${u.name}님, 가입을 환영해요!` : `${u.name}님, 어서오세요!`);
+};
+
+/* ---------------- 관리자 ---------------- */
+$("btn-admin-open").onclick = ()=>{
+  $("admin-pin").value = "";
+  $("modal-admin-pin").classList.remove("hidden");
+  setTimeout(()=>$("admin-pin").focus(), 100);
+};
+$("btn-admin-pin-cancel").onclick = ()=>$("modal-admin-pin").classList.add("hidden");
+$("btn-admin-pin-ok").onclick = async ()=>{
+  if($("admin-pin").value !== ADMIN_PIN) return toast("PIN이 맞지 않아요");
+  $("modal-admin-pin").classList.add("hidden");
+  await openAdminPanel();
+};
+async function openAdminPanel(){
+  $("admin-app-name").value = appSettings.app_name || "ON AIR";
+  $("admin-tagline").value = appSettings.tagline || "";
+  $("admin-presets").value = (appSettings.default_presets || DEFAULT_PRESETS).join("\n");
+  const dt = appSettings.default_theme || "dark";
+  document.querySelectorAll("[data-adm-theme]").forEach(b=>{
+    b.classList.toggle("sel", b.dataset.admTheme === dt);
+    b.onclick = ()=>{
+      appSettings.default_theme = b.dataset.admTheme;
+      document.querySelectorAll("[data-adm-theme]").forEach(x=>x.classList.toggle("sel", x === b));
+    };
+  });
+  const list = $("admin-rooms");
+  list.innerHTML = "<div class='row'>불러오는 중...</div>";
+  const rooms = await api.adminListRooms();
+  list.innerHTML = rooms.length ? "" : "<div class='row'>만들어진 방이 없습니다</div>";
+  rooms.forEach(r=>{
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<span class="grow">${r.name} <small style="color:var(--dim)">코드 ${r.code}</small></span>`;
+    const del = document.createElement("button");
+    del.className = "mini"; del.textContent = "삭제"; del.style.color = "var(--danger)";
+    del.onclick = async ()=>{
+      if(del.dataset.armed !== "1"){ del.dataset.armed="1"; del.textContent="한 번 더!"; setTimeout(()=>{del.dataset.armed="";del.textContent="삭제";},2500); return; }
+      await api.adminDeleteRoom(r.id);
+      row.remove(); toast("방을 삭제했어요");
+    };
+    row.appendChild(del);
+    list.appendChild(row);
+  });
+  $("modal-admin").classList.remove("hidden");
+}
+$("btn-admin-close").onclick = ()=>$("modal-admin").classList.add("hidden");
+$("btn-admin-save").onclick = async ()=>{
+  appSettings.app_name = $("admin-app-name").value.trim() || "ON AIR";
+  appSettings.tagline = $("admin-tagline").value.trim();
+  appSettings.default_presets = $("admin-presets").value.split("\n").map(s=>s.trim()).filter(Boolean).slice(0,12);
+  const ok = await api.saveSettings(appSettings);
+  if(ok === false) return;
+  applyBranding();
+  $("modal-admin").classList.add("hidden");
+  toast("관리자 설정을 저장했어요" + (MODE === "cloud" ? " (모든 사용자에게 적용)" : ""));
+};
+
+/* ---------------- 앱 설치 (PWA) ---------------- */
+let deferredInstall = null;
+function initPWA(){
+  if("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")){
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  }
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  if(standalone) return;
+  window.addEventListener("beforeinstallprompt", (e)=>{
+    e.preventDefault();
+    deferredInstall = e;
+    $("btn-install").classList.remove("hidden");
+  });
+  $("btn-install").onclick = async ()=>{
+    if(!deferredInstall) return;
+    deferredInstall.prompt();
+    const { outcome } = await deferredInstall.userChoice;
+    if(outcome === "accepted") toast("앱이 설치됐어요! 홈 화면에서 열어보세요");
+    deferredInstall = null;
+    $("btn-install").classList.add("hidden");
+  };
+  window.addEventListener("appinstalled", ()=>{
+    $("btn-install").classList.add("hidden");
+    toast("설치 완료! 홈 화면 아이콘으로 열 수 있어요");
+  });
+}
+init();
+
+/* ---------------- 홈 버튼 ---------------- */
+let joinRole = "member";
+$("role-member").onclick = ()=>{ joinRole="member"; $("role-member").classList.add("selected"); $("role-accomp").classList.remove("selected"); };
+$("role-accomp").onclick = ()=>{ joinRole="accomp"; $("role-accomp").classList.add("selected"); $("role-member").classList.remove("selected"); };
+
+$("btn-create").onclick = async ()=>{
+  const name = $("create-name").value.trim();
+  if(!name) return toast("방 이름을 입력하세요");
+  const btn = $("btn-create"); btn.disabled = true;
+  const room = await api.createRoom(name);
+  btn.disabled = false;
+  if(!room) return;
+  const u = currentUser();
+  state.myName = u ? u.nickname : "리더";
+  enterRoom(room, "leader");
+};
+
+$("btn-join").onclick = async ()=>{
+  const code = $("join-code").value.trim().toUpperCase();
+  const u = currentUser();
+  const name = (u ? u.nickname : $("join-name").value.trim()) || "팀원";
+  if(code.length !== 6) return toast("6자리 코드를 입력하세요");
+  const btn = $("btn-join"); btn.disabled = true;
+  const room = await api.findRoom(code);
+  btn.disabled = false;
+  if(!room) return toast("방을 찾을 수 없어요. 코드를 확인하세요");
+  if(!u) localStorage.setItem("praise_name", name);
+  state.myName = name;
+  enterRoom(room, joinRole);
+};
+
+/* ---------------- 방 입장 ---------------- */
+async function enterRoom(room, role){
+  state.room = room; state.role = role;
+  state.songIdx = room.current_song || 0;
+  state.page = room.current_page || 0;
+  state.duo = (role === "accomp");
+  state.ann = {}; state.tool = null;
+  state.free = false; state.blackout = false;
+  $("blackout").classList.remove("show");
+
+  $("screen-home").classList.add("hidden");
+  $("screen-room").classList.remove("hidden");
+  $("room-name").textContent = room.name;
+  $("room-code-label").textContent = "코드 " + room.code;
+  $("presence-count").textContent = MODE === "demo" ? "로컬 모드" : "";
+
+  const isLeader = role === "leader";
+  $("msg-row").classList.toggle("hidden", !isLeader);
+  $("tool-row").classList.toggle("hidden", !isLeader);
+  $("btn-settings").classList.toggle("hidden", !isLeader);
+  $("btn-share").classList.toggle("hidden", !isLeader);
+  $("nav-row").classList.remove("hidden");
+  $("btn-prev").style.visibility = isLeader ? "visible" : "hidden";
+  $("btn-next").style.visibility = isLeader ? "visible" : "hidden";
+  $("btn-duo").classList.remove("hidden");
+  $("btn-duo").classList.toggle("on", state.duo);
+  $("btn-free").classList.toggle("hidden", isLeader);
+  $("btn-free").classList.remove("on");
+  $("btn-free").textContent = "🔓 자유";
+  applyInvert();
+
+  buildChips();
+  await loadSongs();
+  connectChannel();
+  requestWake();
+  render();
+}
+
+$("btn-back").onclick = ()=>{
+  if(channel){ channel.close(); channel = null; }
+  if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
+  $("screen-room").classList.add("hidden");
+  $("screen-home").classList.remove("hidden");
+};
+
+/* ---------------- 화면 꺼짐 방지 ---------------- */
+async function requestWake(){
+  try{ wakeLock = await navigator.wakeLock.request("screen"); }catch(e){}
+}
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "visible" && state.room) requestWake();
+});
+
+/* ---------------- 실시간 이벤트 ---------------- */
+function onEvent(event, payload){
+  switch(event){
+    case "page":
+      if(state.role === "leader" || state.free) return;
+      state.songIdx = payload.songIdx; state.page = payload.page; render(); break;
+    case "msg": showFlash(payload.text, payload.from); break;
+    case "stroke": { const a = getAnn(payload.key); a.strokes.push(payload.stroke); a.order.push("s"); redrawIfVisible(payload.key); break; }
+    case "badge": { const a = getAnn(payload.key); a.badges.push(payload.badge); a.order.push("b"); redrawIfVisible(payload.key); break; }
+    case "erase": state.ann[payload.key] = { strokes:[], badges:[], order:[] }; redrawIfVisible(payload.key); break;
+    case "undo": undoKey(payload.key); break;
+    case "eraseAll":
+      state.ann = {};
+      document.querySelectorAll(".pane canvas").forEach(drawAnn);
+      break;
+    case "songs": loadSongs().then(render); break;
+    case "badgeMove": {
+      const a = getAnn(payload.key);
+      if(a.badges[payload.index]){ a.badges[payload.index].x = payload.x; a.badges[payload.index].y = payload.y; }
+      redrawIfVisible(payload.key); break;
+    }
+    case "blackout":
+      state.blackout = payload.on;
+      if(state.role !== "leader") $("blackout").classList.toggle("show", payload.on);
+      break;
+    case "hello":
+      if(state.role !== "leader") return;
+      channel?.send("state", { songIdx: state.songIdx, page: state.page, ann: state.ann, blackout: !!state.blackout });
+      break;
+    case "state":
+      if(state.role === "leader") return;
+      if(!state.free){ state.songIdx = payload.songIdx; state.page = payload.page; }
+      state.ann = payload.ann || {};
+      state.blackout = !!payload.blackout;
+      $("blackout").classList.toggle("show", state.blackout);
+      render();
+      break;
+  }
+}
+
+function connectChannel(){
+  channel = api.openChannel(state.room.id, onEvent, (ok)=>{
+    $("live-dot").classList.toggle("off", !ok);
+    $("live-label").textContent = ok ? "LIVE" : "연결 중";
+    if(ok && state.role !== "leader") channel?.send("hello", {});
+  });
+}
+
+/* ---------------- 데이터 ---------------- */
+async function loadSongs(){
+  state.songs = await api.listSongs(state.room.id);
+  if(state.songIdx >= state.songs.length) state.songIdx = Math.max(0, state.songs.length - 1);
+}
+function saveRoomPosition(){
+  api.updateRoom(state.room.id, { current_song: state.songIdx, current_page: state.page });
+}
+
+/* ---------------- 페이지 넘김 ---------------- */
+function flip(dir){
+  const song = state.songs[state.songIdx];
+  if(!song) return;
+  const pages = song.pages.length;
+  let s = state.songIdx, p = state.page + dir;
+  if(p >= pages){
+    if(s + 1 < state.songs.length){ s++; p = 0; toast("다음 곡: " + state.songs[s].title); }
+    else p = pages - 1;
+  }else if(p < 0){
+    if(s - 1 >= 0){ s--; p = state.songs[s].pages.length - 1; }
+    else p = 0;
+  }
+  state.songIdx = s; state.page = p;
+  if(state.role === "leader"){                 // 리더만 전체 동기화
+    channel?.send("page", { songIdx:s, page:p });
+    saveRoomPosition();
+  }
+  render();
+}
+$("btn-prev").onclick = ()=>flip(-1);
+$("btn-next").onclick = ()=>flip(1);
+
+// 🔓 자유 열람 (팀원·반주자): 잠시 리더 따라가기를 끄고 자유롭게 넘겨보기
+$("btn-free").onclick = ()=>{
+  state.free = !state.free;
+  $("btn-free").classList.toggle("on", state.free);
+  $("btn-free").textContent = state.free ? "🔒 따라가기" : "🔓 자유";
+  $("btn-prev").style.visibility = state.free ? "visible" : "hidden";
+  $("btn-next").style.visibility = state.free ? "visible" : "hidden";
+  if(state.free){
+    toast("자유 열람 중 — 리더 넘김을 잠시 안 따라가요");
+  }else{
+    channel?.send("hello", {});   // 리더 위치로 복귀
+    toast("리더 따라가기로 돌아왔어요");
+  }
+};
+
+// 블루투스 페이지터너 / 키보드 방향키 (입력창·모달이 열려 있으면 무시 → 띄어쓰기 정상 작동)
+document.addEventListener("keydown", (e)=>{
+  if(!state.room) return;
+  const typing = e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA");
+  const modalOpen = document.querySelector(".modal-veil:not(.hidden)");
+  if(typing || modalOpen) return;
+  const canFlip = state.role === "leader" || state.free;
+  if(!canFlip) return;
+  if(["ArrowRight","PageDown"," "].includes(e.key)) { e.preventDefault(); flip(1); }
+  if(["ArrowLeft","PageUp"].includes(e.key)) { e.preventDefault(); flip(-1); }
+});
+
+/* ---------------- 렌더링 ---------------- */
+function render(){
+  const stage = $("stage");
+  stage.innerHTML = "";
+  stage.classList.toggle("duo", state.duo);
+  const song = state.songs[state.songIdx];
+
+  if(!song || !song.pages.length){
+    const d = document.createElement("div");
+    d.className = "stage-empty";
+    d.innerHTML = state.role === "leader"
+      ? "아직 악보가 없습니다.<br/>[콘티] → [+ 곡 추가]로 악보 사진을 올려보세요."
+      : "아직 악보가 없습니다.<br/>리더가 곡을 추가하면 여기에 표시됩니다.";
+    stage.appendChild(d);
+  }else{
+    const pagesToShow = [state.page];
+    if(state.duo && state.page + 1 < song.pages.length) pagesToShow.push(state.page + 1);
+    pagesToShow.forEach(p => stage.appendChild(buildPane(song, p)));
+  }
+
+  $("song-title").textContent = song ? `${state.songIdx+1}. ${song.title}` : "-";
+  $("page-label").textContent = song ? `${state.page+1} / ${song.pages.length} 쪽` : "- / -";
+  const note = (song && song.note) ? song.note.trim() : "";
+  $("note-bar").classList.toggle("hidden", !note);
+  $("note-bar").textContent = note ? "📝 " + note : "";
+  renderSetlist();
+}
+
+function buildPane(song, page){
+  const pane = document.createElement("div");
+  pane.className = "pane";
+  const img = document.createElement("img");
+  img.src = song.pages[page];
+  const cv = document.createElement("canvas");
+  cv.dataset.key = `${song.id}:${page}`;
+  const tag = document.createElement("div");
+  tag.className = "page-tag";
+  tag.textContent = `${page+1}/${song.pages.length}`;
+  pane.append(img, cv, tag);
+  const ready = ()=>{ fitCanvas(cv, img); drawAnn(cv); };
+  if(img.complete) requestAnimationFrame(ready); else img.onload = ready;
+  if(state.role === "leader") attachDrawing(cv);
+  return pane;
+}
+
+function fitCanvas(cv, img){
+  cv.width = Math.max(1, img.clientWidth * devicePixelRatio);
+  cv.height = Math.max(1, img.clientHeight * devicePixelRatio);
+}
+window.addEventListener("resize", ()=>{ if(state.room) render(); });
+
+function drawAnn(cv){
+  const ann = state.ann[cv.dataset.key];
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0,0,cv.width,cv.height);
+  if(!ann) return;
+  const w = cv.width, h = cv.height;
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for(const st of ann.strokes){
+    const pts = st.p || st;                    // 구버전(배열) 호환
+    ctx.strokeStyle = st.c || "#e03a2f";
+    ctx.lineWidth = Math.max(2, w * (st.w || 0.006));
+    ctx.beginPath();
+    pts.forEach((pt,i)=> i ? ctx.lineTo(pt[0]*w, pt[1]*h) : ctx.moveTo(pt[0]*w, pt[1]*h));
+    ctx.stroke();
+  }
+  ctx.font = `bold ${Math.max(14, w*0.028)}px Pretendard, sans-serif`;
+  for(const b of ann.badges){
+    const label = "⭐ " + b.name;
+    const tw = ctx.measureText(label).width;
+    const x = b.x*w, y = b.y*h, padX = w*0.012, padY = w*0.016;
+    ctx.fillStyle = "rgba(232,176,75,.95)";
+    roundRect(ctx, x - tw/2 - padX, y - padY - w*0.014, tw + padX*2, w*0.028 + padY*1.6, w*0.01);
+    ctx.fill();
+    ctx.fillStyle = "#1c1608";
+    ctx.fillText(label, x - tw/2, y);
+  }
+}
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function redrawIfVisible(key){
+  document.querySelectorAll(`canvas[data-key="${key}"]`).forEach(drawAnn);
+}
+
+/* ---------------- 그리기 / 솔로 (리더) ---------------- */
+let pendingSolo = null;   // 솔로 지정 대기 위치 { key, x, y }
+
+// 펜 설정 (색상·굵기) — 기기별 저장
+const PEN_COLORS = ["#e03a2f","#1f6fe0","#199a4c","#f28c1b","#8b4de0","#111111"];
+const PEN_SIZES = [ {label:"얇게", w:0.0035}, {label:"보통", w:0.006}, {label:"굵게", w:0.011} ];
+let pen = { c:"#e03a2f", w:0.006 };
+try{ pen = Object.assign(pen, JSON.parse(localStorage.getItem("praise_pen")||"{}")); }catch(e){}
+
+function buildPenModal(){
+  const cbox = $("pen-colors"); cbox.innerHTML = "";
+  PEN_COLORS.forEach(c=>{
+    const b = document.createElement("button");
+    b.className = "swatch" + (pen.c === c ? " sel" : "");
+    b.style.background = c;
+    b.onclick = ()=>{ pen.c = c; buildPenModal(); };
+    cbox.appendChild(b);
+  });
+  const sbox = $("pen-sizes"); sbox.innerHTML = "";
+  PEN_SIZES.forEach(s=>{
+    const b = document.createElement("button");
+    b.className = "btn" + (Math.abs(pen.w - s.w) < 0.0001 ? " sel" : "");
+    b.textContent = s.label;
+    b.onclick = ()=>{ pen.w = s.w; buildPenModal(); };
+    sbox.appendChild(b);
+  });
+}
+$("btn-pen-start").onclick = ()=>{
+  localStorage.setItem("praise_pen", JSON.stringify(pen));
+  $("modal-pen").classList.add("hidden");
+  if(state.tool !== "draw") setTool("draw");
+};
+$("btn-pen-cancel").onclick = ()=>$("modal-pen").classList.add("hidden");
+
+function attachDrawing(cv){
+  let stroke = null;
+  let dragBadge = null;   // { key, index }
+  const norm = (e)=>{
+    const r = cv.getBoundingClientRect();
+    return [ +((e.clientX - r.left)/r.width).toFixed(4), +((e.clientY - r.top)/r.height).toFixed(4) ];
+  };
+  cv.addEventListener("pointerdown", (e)=>{
+    const key = cv.dataset.key;
+    if(state.tool === "solo"){
+      const [x,y] = norm(e);
+      pendingSolo = { key, x, y };
+      $("solo-name").value = "";
+      $("modal-solo").classList.remove("hidden");
+      setTimeout(()=>$("solo-name").focus(), 100);
+      setTool(null);
+      return;
+    }
+    if(state.tool === "draw"){
+      e.preventDefault(); cv.setPointerCapture(e.pointerId);
+      stroke = [norm(e)];
+      return;
+    }
+    // 도구가 꺼져 있을 때: 솔로 배지를 잡으면 드래그로 이동
+    const ann = state.ann[key];
+    if(ann && ann.badges.length){
+      const [nx, ny] = norm(e);
+      const thX = 0.09, thY = 0.035;   // 배지 잡는 범위 (좌우로 넓게)
+      let best = -1, bestD = 1e9;
+      ann.badges.forEach((b, i)=>{
+        const dx = Math.abs(nx - b.x), dy = Math.abs(ny - b.y);
+        if(dx < thX && dy < thY && dx + dy < bestD){ best = i; bestD = dx + dy; }
+      });
+      if(best >= 0){
+        e.preventDefault(); cv.setPointerCapture(e.pointerId);
+        dragBadge = { key, index: best };
+      }
+    }
+  });
+  cv.addEventListener("pointermove", (e)=>{
+    if(dragBadge){
+      const [x,y] = norm(e);
+      const b = getAnn(dragBadge.key).badges[dragBadge.index];
+      if(b){ b.x = x; b.y = y; drawAnn(cv); }
+      return;
+    }
+    if(!stroke) return;
+    stroke.push(norm(e));
+    const ctx = cv.getContext("2d");
+    const w = cv.width, h = cv.height;
+    ctx.strokeStyle = pen.c; ctx.lineCap = "round";
+    ctx.lineWidth = Math.max(2, w * pen.w);
+    const a = stroke[stroke.length-2], b = stroke[stroke.length-1];
+    ctx.beginPath(); ctx.moveTo(a[0]*w, a[1]*h); ctx.lineTo(b[0]*w, b[1]*h); ctx.stroke();
+  });
+  cv.addEventListener("pointerup", ()=>{
+    if(dragBadge){
+      const b = getAnn(dragBadge.key).badges[dragBadge.index];
+      if(b) channel?.send("badgeMove", { key: dragBadge.key, index: dragBadge.index, x: b.x, y: b.y });
+      dragBadge = null;
+      return;
+    }
+    if(!stroke) return;
+    if(stroke.length > 1){
+      const key = cv.dataset.key;
+      const st = { p: stroke, c: pen.c, w: pen.w };
+      const a = getAnn(key);
+      a.strokes.push(st); a.order.push("s");
+      channel?.send("stroke", { key, stroke: st });
+    }
+    stroke = null;
+  });
+}
+
+// 솔로 이름 확정
+$("btn-solo-ok").onclick = ()=>{
+  const name = $("solo-name").value.trim();
+  if(!name) return toast("이름을 입력하세요");
+  if(pendingSolo){
+    const { key, x, y } = pendingSolo;
+    const badge = { x, y, name };
+    const a = getAnn(key);
+    a.badges.push(badge); a.order.push("b");
+    redrawIfVisible(key);
+    channel?.send("badge", { key, badge });
+  }
+  pendingSolo = null;
+  $("modal-solo").classList.add("hidden");
+};
+$("btn-solo-cancel").onclick = ()=>{ pendingSolo = null; $("modal-solo").classList.add("hidden"); };
+
+function setTool(t){
+  state.tool = (state.tool === t) ? null : t;
+  $("btn-draw").classList.toggle("on", state.tool === "draw");
+  $("btn-solo").classList.toggle("on", state.tool === "solo");
+  if(state.tool === "solo") toast("악보에서 솔로 위치를 탭하세요");
+  if(state.tool === "draw") toast("악보 위에 손가락/펜으로 그리세요");
+}
+$("btn-draw").onclick = ()=>{
+  if(state.tool === "draw"){ setTool(null); return; }
+  buildPenModal();
+  $("modal-pen").classList.remove("hidden");
+};
+$("btn-solo").onclick = ()=>setTool("solo");
+
+// ↩ 되돌리기: 현재 페이지에서 방금 그린 선/배지 하나만 취소
+function undoKey(key){
+  const a = getAnn(key);
+  const last = a.order.pop();
+  if(last === "b") a.badges.pop();
+  else if(last === "s") a.strokes.pop();
+  else if(a.strokes.length) a.strokes.pop();   // 순서 기록 없는 옛 데이터 대비
+  else if(a.badges.length) a.badges.pop();
+  else return false;
+  redrawIfVisible(key);
+  return true;
+}
+$("btn-undo").onclick = ()=>{
+  const key = annKeyCurrent();
+  if(!key) return;
+  if(undoKey(key)){
+    channel?.send("undo", { key });
+    toast("방금 표시를 되돌렸어요");
+  }else{
+    toast("이 쪽에는 되돌릴 표시가 없어요");
+  }
+};
+function annKeyCurrent(){
+  const s = state.songs[state.songIdx];
+  return s ? `${s.id}:${state.page}` : null;
+}
+
+// 지우기: 지금 보이는 쪽만
+$("btn-erase").onclick = ()=>{
+  document.querySelectorAll(".pane canvas").forEach(cv=>{
+    const key = cv.dataset.key;
+    state.ann[key] = { strokes:[], badges:[], order:[] };
+    drawAnn(cv);
+    channel?.send("erase", { key });
+  });
+  toast("이 쪽의 표시를 모두 지웠어요");
+};
+
+// 🧹 전체 지우기: 모든 곡·모든 쪽 (설정 안)
+$("btn-erase-all").onclick = ()=>{
+  state.ann = {};
+  document.querySelectorAll(".pane canvas").forEach(drawAnn);
+  channel?.send("eraseAll", {});
+  $("modal-settings").classList.add("hidden");
+  toast("모든 곡의 펜·솔로 표시를 지웠어요");
+};
+
+/* ---------------- 메시지 ---------------- */
+function buildChips(){
+  const row = $("msg-row");
+  row.innerHTML = "";
+  // ⏹ 대기 화면: 찬양 전/사이에 팀원 화면을 검은 대기 화면으로
+  const bo = document.createElement("button");
+  bo.className = "chip accent"; bo.id = "chip-blackout";
+  bo.textContent = state.blackout ? "▶ 대기 해제" : "⏹ 대기 화면";
+  bo.onclick = ()=>{
+    state.blackout = !state.blackout;
+    bo.textContent = state.blackout ? "▶ 대기 해제" : "⏹ 대기 화면";
+    channel?.send("blackout", { on: state.blackout });
+    toast(state.blackout ? "팀원 화면을 대기 화면으로 전환했어요" : "대기 화면을 해제했어요");
+  };
+  row.appendChild(bo);
+  (state.room.presets || DEFAULT_PRESETS).forEach(text=>{
+    const b = document.createElement("button");
+    b.className = "chip"; b.textContent = text;
+    b.onclick = ()=>sendMsg(text);
+    row.appendChild(b);
+  });
+  // 직접 입력해서 보내기
+  const custom = document.createElement("button");
+  custom.className = "chip accent"; custom.textContent = "✍ 직접 입력";
+  custom.onclick = ()=>{
+    $("custom-msg-text").value = "";
+    $("modal-msg").classList.remove("hidden");
+    setTimeout(()=>$("custom-msg-text").focus(), 100);
+  };
+  row.appendChild(custom);
+}
+function sendMsg(text){
+  channel?.send("msg", { text, from: state.room.name });
+  showFlash(text, "내가 보낸 메시지");
+}
+$("btn-msg-send").onclick = ()=>{
+  const t = $("custom-msg-text").value.trim();
+  if(!t) return toast("문구를 입력하세요");
+  sendMsg(t);
+  $("modal-msg").classList.add("hidden");
+};
+$("btn-msg-cancel").onclick = ()=>$("modal-msg").classList.add("hidden");
+$("custom-msg-text").addEventListener("keydown", (e)=>{ if(e.key === "Enter") $("btn-msg-send").click(); });
+function showFlash(text, from){
+  $("flash-text").textContent = text;
+  $("flash-from").textContent = from || "";
+  const f = $("flash");
+  f.classList.add("show");
+  try{ navigator.vibrate && navigator.vibrate(180); }catch(e){}
+  clearTimeout(f._tm);
+  f._tm = setTimeout(()=>f.classList.remove("show"), 3200);
+}
+
+/* ---------------- 콘티 서랍 ---------------- */
+function openDrawer(v){
+  $("drawer").classList.toggle("show", v);
+  $("drawer-veil").classList.toggle("show", v);
+}
+$("btn-setlist").onclick = ()=>openDrawer(true);
+$("drawer-veil").onclick = ()=>openDrawer(false);
+
+function renderSetlist(){
+  const box = $("setlist");
+  box.innerHTML = "";
+  $("btn-add-song").style.display = state.role === "leader" ? "" : "none";
+  if(!state.songs.length){
+    box.innerHTML = `<p style="color:var(--dim);font-size:13px;text-align:center;padding:20px 0;">곡이 없습니다. '+ 곡 추가'로 악보를 올려보세요.</p>`;
+    return;
+  }
+  state.songs.forEach((s, i)=>{
+    const item = document.createElement("div");
+    item.className = "song-item" + (i === state.songIdx ? " current" : "");
+    const t = document.createElement("div");
+    t.className = "t";
+    const memo = s.note ? `<span class="memo">📝 ${s.note}</span>` : "";
+    t.innerHTML = `${i+1}. ${s.title}<small>${s.pages.length}쪽</small>${memo}`;
+    t.onclick = ()=>{
+      if(state.role !== "leader") return;
+      state.songIdx = i; state.page = 0;
+      channel?.send("page", { songIdx:i, page:0 });
+      saveRoomPosition(); render(); openDrawer(false);
+    };
+    item.appendChild(t);
+    if(state.role === "leader"){
+      const del = mini("삭제", async ()=>{
+        // 두 번 탭으로 확정 (confirm 창이 안 뜨는 환경 대비)
+        if(del.dataset.armed !== "1"){
+          del.dataset.armed = "1";
+          del.textContent = "한 번 더!";
+          del.style.color = "var(--danger)"; del.style.borderColor = "var(--danger)";
+          setTimeout(()=>{ del.dataset.armed = ""; del.textContent = "삭제";
+            del.style.color = "var(--danger)"; del.style.borderColor = "var(--line)"; }, 2500);
+          return;
+        }
+        await api.deleteSong(state.room.id, s.id);
+        await loadSongs(); render();
+        channel?.send("songs", {});
+        toast(`'${s.title}' 곡을 삭제했어요`);
+      });
+      del.style.color = "var(--danger)";
+      item.append(mini("▲", ()=>reorder(i,-1)), mini("▼", ()=>reorder(i,1)), del);
+    }
+    box.appendChild(item);
+  });
+}
+function mini(label, fn){
+  const b = document.createElement("button");
+  b.className = "mini"; b.textContent = label; b.onclick = fn;
+  return b;
+}
+async function reorder(i, dir){
+  const j = i + dir;
+  if(j < 0 || j >= state.songs.length) return;
+  await api.setSort(state.room.id, state.songs[i].id, j);
+  await api.setSort(state.room.id, state.songs[j].id, i);
+  await loadSongs(); render();
+  channel?.send("songs", {});
+}
+
+/* ---------------- 곡 추가 (자동 리사이즈 업로드) ---------------- */
+$("btn-add-song").onclick = ()=>{ $("modal-add").classList.remove("hidden"); };
+$("btn-add-cancel").onclick = ()=>{ $("modal-add").classList.add("hidden"); };
+
+$("btn-upload").onclick = async ()=>{
+  const title = $("add-title").value.trim();
+  const files = [...$("add-files").files];
+  if(!title) return toast("곡 제목을 입력하세요");
+  if(!files.length) return toast("악보 이미지나 PDF를 선택하세요");
+  const btn = $("btn-upload");
+  btn.disabled = true; btn.textContent = "준비 중...";
+  try{
+    const songId = uid();
+    const maxDim = MODE === "demo" ? 1100 : 1600;   // 로컬 모드는 저장 공간 절약
+    const quality = MODE === "demo" ? 0.7 : 0.82;
+
+    // 1) 모든 파일을 페이지 이미지(blob) 목록으로 변환 (PDF는 페이지별로 풀어냄)
+    const blobs = [];
+    for(const file of files){
+      const kind = await sniffType(file);   // 확장자가 아니라 실제 파일 내용으로 판별
+      const isPdf = kind === "pdf" || file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+      if(isPdf){
+        const pages = await pdfToBlobs(file, maxDim, quality, (p, total)=>{
+          btn.textContent = `PDF 변환 중... (${p}/${total}쪽)`;
+        });
+        blobs.push(...pages);
+      }else{
+        btn.textContent = "이미지 처리 중...";
+        blobs.push(await resizeImage(file, maxDim, quality));
+      }
+    }
+    if(!blobs.length) throw new Error("변환된 페이지가 없어요");
+    if(MODE === "demo" && blobs.length > 15){
+      toast("로컬 모드에서는 곡당 15쪽까지만 올라가요");
+      blobs.length = 15;
+    }
+
+    // 2) 순서대로 업로드
+    const urls = [];
+    for(let i = 0; i < blobs.length; i++){
+      btn.textContent = `올리는 중... (${i+1}/${blobs.length})`;
+      urls.push(await api.uploadPage(state.room.id, songId, i, blobs[i]));
+    }
+    const maxSort = state.songs.reduce((m,s)=>Math.max(m, s.sort), -1);
+    const ok = await api.insertSong({ id: songId, room_id: state.room.id, title, sort: maxSort+1, pages: urls });
+    if(ok === false) throw new Error("저장 실패");
+    await loadSongs(); render();
+    channel?.send("songs", {});
+    $("modal-add").classList.add("hidden");
+    $("add-title").value = ""; $("add-files").value = "";
+    toast(`'${title}' 추가 완료 (${urls.length}쪽)`);
+  }catch(e){
+    toast("업로드 실패: " + (e.message || e));
+  }finally{
+    btn.disabled = false; btn.textContent = "올리기";
+  }
+};
+
+/* PDF → 페이지별 JPEG 변환 (브라우저 안에서 처리, 서버 불필요) */
+let _pdfWorkerReady = false;
+async function ensurePdfWorker(){
+  if(_pdfWorkerReady) return;
+  const workerUrl = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  try{
+    // worker 스크립트를 받아 blob으로 감싸 등록 → CDN 직접 참조보다 안정적, fake worker 경고 방지
+    const res = await fetch(workerUrl);
+    if(!res.ok) throw new Error("worker fetch 실패");
+    const code = await res.text();
+    const blobUrl = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
+    pdfjsLib.GlobalWorkerOptions.workerSrc = blobUrl;
+  }catch(e){
+    // 폴백: 직접 CDN 주소 (인터넷은 되지만 fetch가 막힌 경우)
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+  }
+  _pdfWorkerReady = true;
+}
+
+async function pdfToBlobs(file, maxDim, quality, onProgress){
+  if(!window.pdfjsLib) throw new Error("PDF 변환기를 불러오지 못했어요. 인터넷 연결을 확인해주세요");
+  await ensurePdfWorker();
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const blobs = [];
+  for(let p = 1; p <= pdf.numPages; p++){
+    onProgress && onProgress(p, pdf.numPages);
+    const page = await pdf.getPage(p);
+    let vp = page.getViewport({ scale: 1 });
+    const scale = Math.min(3, maxDim / Math.max(vp.width, vp.height));
+    vp = page.getViewport({ scale });
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    blobs.push(await new Promise((res, rej)=>
+      cv.toBlob(b => b ? res(b) : rej(new Error("PDF 페이지 변환 실패")), "image/jpeg", quality)
+    ));
+    page.cleanup();
+  }
+  return blobs;
+}
+
+/* ---- 이미지 읽기: 3단계 폴백으로 웬만한 파일은 다 읽어냄 ---- */
+async function resizeImage(file, maxDim, quality){
+  const src = await fileToImageSource(file);
+  const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height;
+  if(!sw || !sh) throw new Error(`'${file.name}' 크기를 읽을 수 없어요`);
+  const scale = Math.min(1, maxDim / Math.max(sw, sh));
+  const cv = document.createElement("canvas");
+  cv.width = Math.max(1, Math.round(sw * scale));
+  cv.height = Math.max(1, Math.round(sh * scale));
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(src, 0, 0, cv.width, cv.height);
+  if(src.close) src.close();
+  const blob = await new Promise(res => cv.toBlob(res, "image/jpeg", quality));
+  if(!blob) throw new Error(`'${file.name}' 변환에 실패했어요`);
+  return blob;
+}
+
+async function fileToImageSource(file){
+  if(!file.size) throw new Error(`'${file.name}' 파일이 비어 있어요(0바이트). 다시 다운로드해서 올려주세요`);
+  // 1차: createImageBitmap (가장 강력한 디코더)
+  if(window.createImageBitmap){
+    try{ return await createImageBitmap(file); }catch(e){}
+  }
+  // 2차: blob URL로 <img> 로딩
+  try{ return await loadImg(URL.createObjectURL(file), true); }catch(e){}
+  // 3차: FileReader dataURL로 <img> 로딩
+  const dataUrl = await new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>res(r.result); r.onerror = ()=>rej();
+    r.readAsDataURL(file);
+  }).catch(()=>null);
+  if(dataUrl){
+    try{ return await loadImg(dataUrl, false); }catch(e){}
+  }
+  // 전부 실패 → 실제 형식을 알려주며 안내
+  const kind = await sniffType(file);
+  if(kind === "heic" || kind === "avif")
+    throw new Error(`'${file.name}'은 ${kind.toUpperCase()} 형식(아이폰 원본 등)이라 이 브라우저가 못 읽어요. 갤러리에서 JPG로 저장하거나 스크린샷으로 올려주세요`);
+  throw new Error(`'${file.name}'을 이미지로 열 수 없어요(감지된 형식: ${kind}). 스크린샷으로 다시 저장해서 올려보세요`);
+}
+
+function loadImg(src, isBlobUrl){
+  return new Promise((res, rej)=>{
+    const img = new Image();
+    img.onload = ()=>{ if(isBlobUrl) URL.revokeObjectURL(src); res(img); };
+    img.onerror = ()=>{ if(isBlobUrl) URL.revokeObjectURL(src); rej(new Error("decode 실패")); };
+    img.src = src;
+  });
+}
+
+/* 확장자가 아닌 파일 내용(시그니처)으로 실제 형식 판별 */
+async function sniffType(file){
+  try{
+    const buf = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+    const ascii = String.fromCharCode.apply(null, buf);
+    if(buf[0] === 0x89 && ascii.slice(1,4) === "PNG") return "png";
+    if(buf[0] === 0xFF && buf[1] === 0xD8) return "jpeg";
+    if(ascii.startsWith("GIF8")) return "gif";
+    if(ascii.startsWith("RIFF") && ascii.slice(8,12) === "WEBP") return "webp";
+    if(ascii.startsWith("%PDF")) return "pdf";
+    if(ascii.startsWith("BM")) return "bmp";
+    if(ascii.slice(4,8) === "ftyp"){
+      const brand = ascii.slice(8,12);
+      if(/hei|hev|mif/.test(brand)) return "heic";
+      if(brand.indexOf("avif") >= 0 || brand.indexOf("avis") >= 0) return "avif";
+    }
+    return "알 수 없음";
+  }catch(e){ return "읽기 불가"; }
+}
+
+/* ---------------- 📝 곡 멘트 (콘티 코멘트) ---------------- */
+$("btn-note").onclick = ()=>{
+  const song = state.songs[state.songIdx];
+  if(!song) return toast("먼저 곡을 추가하세요");
+  $("note-song-label").textContent = `${state.songIdx+1}. ${song.title}`;
+  $("note-text").value = song.note || "";
+  $("modal-note").classList.remove("hidden");
+  setTimeout(()=>$("note-text").focus(), 100);
+};
+$("btn-note-cancel").onclick = ()=>$("modal-note").classList.add("hidden");
+$("btn-note-save").onclick = async ()=>{
+  const song = state.songs[state.songIdx];
+  if(!song) return;
+  const note = $("note-text").value.trim();
+  const ok = await api.updateSongNote(state.room.id, song.id, note);
+  if(ok === false) return;
+  song.note = note;
+  render();
+  channel?.send("songs", {});
+  $("modal-note").classList.add("hidden");
+  toast(note ? "멘트를 저장했어요" : "멘트를 지웠어요");
+};
+
+/* ---------------- 반주자 2쪽 보기 ---------------- */
+$("btn-duo").onclick = ()=>{
+  state.duo = !state.duo;
+  $("btn-duo").classList.toggle("on", state.duo);
+  render();
+  if(state.duo) toast("가로 화면에서 보면 더 좋아요");
+};
+
+/* ---------------- 글자 크기 (pt) ---------------- */
+let fontPt = parseFloat(localStorage.getItem("praise_pt")) || 12;
+function applyFontPt(){
+  fontPt = Math.min(20, Math.max(9, fontPt));
+  document.documentElement.style.setProperty("--ui-zoom", (fontPt / 12).toFixed(3));
+  $("pt-val").textContent = fontPt + "pt";
+  localStorage.setItem("praise_pt", fontPt);
+}
+applyFontPt();
+$("btn-font").onclick = ()=>$("modal-font").classList.remove("hidden");
+$("btn-font-close").onclick = ()=>$("modal-font").classList.add("hidden");
+$("btn-pt-up").onclick = ()=>{ fontPt += 1; applyFontPt(); };
+$("btn-pt-down").onclick = ()=>{ fontPt -= 1; applyFontPt(); };
+
+/* ---------------- 공유 / 설정 ---------------- */
+$("btn-share").onclick = async ()=>{
+  if(MODE === "demo"){
+    toast("로컬 모드에서는 같은 브라우저의 다른 탭에서 코드 " + state.room.code + "로 입장할 수 있어요");
+    return;
+  }
+  const url = `${location.origin}${location.pathname}?code=${state.room.code}`;
+  const text = `[${state.room.name}] 라이브 악보 입장\n코드: ${state.room.code}\n${url}`;
+  if(navigator.share){
+    navigator.share({ title:"라이브 악보", text, url }).catch(()=>{});
+  }else{
+    await navigator.clipboard.writeText(text);
+    toast("입장 링크를 복사했어요");
+  }
+};
+
+$("btn-settings").onclick = ()=>{
+  $("preset-text").value = (state.room.presets || DEFAULT_PRESETS).join("\n");
+  $("modal-settings").classList.remove("hidden");
+};
+$("btn-settings-cancel").onclick = ()=>$("modal-settings").classList.add("hidden");
+$("btn-save-presets").onclick = async ()=>{
+  const presets = $("preset-text").value.split("\n").map(s=>s.trim()).filter(Boolean).slice(0, 12);
+  await api.updateRoom(state.room.id, { presets });
+  state.room.presets = presets;
+  buildChips();
+  $("modal-settings").classList.add("hidden");
+  toast("메시지 버튼을 저장했어요");
+};
+</script>
+</body>
+</html>
