@@ -337,7 +337,37 @@
   .pt-row .btn{ flex:none; width:64px; font-size:22px; padding:10px; }
   .pt-row .pt-val{ min-width:80px; text-align:center; font-size:22px; font-weight:800; color:var(--accent); }
 
-  /* ---------- 방 목록 ---------- */
+  /* ---------- 메모 사이드 패널 ---------- */
+  .stage-wrap{ flex:1; display:flex; min-height:0; overflow:hidden; }
+  .memo-panel{
+    width:0; flex:none; overflow:hidden; transition:width .2s ease;
+    background:var(--panel); border-left:1px solid var(--line);
+    display:flex; flex-direction:column;
+  }
+  .memo-panel.open{ width:220px; }
+  @media(max-width:600px){ .memo-panel.open{ width:160px; } }
+  .memo-panel-head{
+    padding:10px 12px 6px; font-size:13px; font-weight:700; color:var(--dim);
+    display:flex; align-items:center; justify-content:space-between; flex:none;
+  }
+  .memo-panel textarea{
+    flex:1; resize:none; background:transparent; border:none; outline:none;
+    color:var(--ink); font-family:inherit; font-size:14px; line-height:1.7;
+    padding:6px 12px 12px;
+  }
+  /* ---------- BPM / 조 표시 ---------- */
+  .song-info-bar{
+    flex:none; display:flex; gap:8px; padding:5px 10px; overflow-x:auto;
+    background:var(--panel-2); border-bottom:1px solid var(--line);
+    scrollbar-width:none;
+  }
+  .song-info-bar::-webkit-scrollbar{ display:none; }
+  .info-chip{
+    flex:none; background:var(--panel); border:1px solid var(--line);
+    border-radius:8px; padding:5px 10px; font-size:13px; font-weight:600;
+    color:var(--ink); cursor:pointer;
+  }
+  .info-chip.accent{ border-color:var(--accent); color:var(--accent); }
   #screen-rooms{
     min-height:100dvh; display:flex; flex-direction:column; align-items:center;
     padding:0 0 40px;
@@ -500,8 +530,19 @@
   </div>
 
   <div class="note-bar hidden" id="note-bar"></div>
+  <div class="song-info-bar hidden" id="song-info-bar"></div>
 
-  <div class="stage" id="stage"></div>
+  <div class="stage-wrap">
+    <div class="stage" id="stage"></div>
+    <!-- 메모 사이드 패널 (팀원·반주자) -->
+    <div class="memo-panel" id="memo-panel">
+      <div class="memo-panel-head">
+        <span>📝 내 메모</span>
+        <button class="link-btn" id="btn-memo-close" style="font-size:18px;text-decoration:none">×</button>
+      </div>
+      <textarea id="memo-panel-text" placeholder="나만 보이는 메모&#10;&#10;예) G키 / 88BPM&#10;2절 후 간주 한 번 더&#10;마지막 아멘 2번"></textarea>
+    </div>
+  </div>
 
   <div class="bottombar" id="bottombar">
     <div class="msg-row hidden" id="msg-row"></div>
@@ -524,11 +565,12 @@
     </div>
     <!-- 팀원·반주자 도구 바 -->
     <div class="tool-row hidden" id="member-tool-row">
-      <button class="icon-btn" id="btn-member-memo">📝 내 메모</button>
-      <button class="icon-btn" id="btn-member-draw">✏️ 내 펜</button>
-      <button class="icon-btn" id="btn-member-undo">↩ 되돌리기</button>
+      <button class="icon-btn" id="btn-member-memo">📝 메모</button>
+      <button class="icon-btn" id="btn-member-draw">✏️ 펜</button>
+      <button class="icon-btn" id="btn-member-undo">↩</button>
       <button class="icon-btn" id="btn-member-erase">지우기</button>
-      <button class="icon-btn" id="btn-member-duo">2쪽 보기</button>
+      <button class="icon-btn" id="btn-member-duo">2쪽</button>
+      <button class="icon-btn" id="btn-member-zoom">🔍 확대</button>
     </div>
   </div>
 </div>
@@ -1756,22 +1798,68 @@ function placeTb(cv, x, y){
    팀원·반주자 기능
    ================================================================ */
 
-// 팀원 개인 메모 (localStorage, 방별 저장)
+// 메모 사이드 패널 (항상 보이는 구조)
 function memoKey(){ return "praise_memo_" + (state.room ? state.room.id : ""); }
+let memoSaveTimer = null;
+
+function openMemoPanel(){
+  const panel = $("memo-panel");
+  panel.classList.add("open");
+  $("btn-member-memo").classList.add("on");
+  $("memo-panel-text").value = localStorage.getItem(memoKey()) || "";
+  setTimeout(()=>$("memo-panel-text").focus(), 200);
+}
+function closeMemoPanel(){
+  $("memo-panel").classList.remove("open");
+  $("btn-member-memo").classList.remove("on");
+  saveMemo();
+}
+function saveMemo(){
+  localStorage.setItem(memoKey(), $("memo-panel-text").value);
+}
 
 $("btn-member-memo").onclick = ()=>{
-  $("member-memo-text").value = localStorage.getItem(memoKey()) || "";
-  $("modal-member-memo").classList.remove("hidden");
-  setTimeout(()=>$("member-memo-text").focus(), 100);
+  if($("memo-panel").classList.contains("open")) closeMemoPanel();
+  else openMemoPanel();
 };
-$("btn-member-memo-save").onclick = ()=>{
-  localStorage.setItem(memoKey(), $("member-memo-text").value);
-  $("modal-member-memo").classList.add("hidden");
-  toast("메모를 저장했어요 (나만 볼 수 있어요)");
-};
-$("btn-member-memo-cancel").onclick = ()=>$("modal-member-memo").classList.add("hidden");
+$("btn-memo-close").onclick = ()=>closeMemoPanel();
 
-// 팀원 펜 (내 화면에만 표시 — 다른 사람에게 전송 안 함)
+// 메모 자동 저장 (타이핑 멈추면 1초 후)
+$("memo-panel-text").addEventListener("input", ()=>{
+  clearTimeout(memoSaveTimer);
+  memoSaveTimer = setTimeout(saveMemo, 1000);
+});
+
+// 곡 정보 바 (BPM, 조, 링크 등 — 콘티 멘트에서 파싱)
+function updateSongInfoBar(){
+  const bar = $("song-info-bar");
+  const song = state.songs[state.songIdx];
+  if(!song || !song.note){ bar.classList.add("hidden"); return; }
+  // 멘트에서 주요 정보 칩으로 표시
+  const chips = song.note.split(/[,\/\n]/).map(s=>s.trim()).filter(Boolean);
+  if(!chips.length){ bar.classList.add("hidden"); return; }
+  bar.innerHTML = chips.map(c=>`<div class="info-chip">${c}</div>`).join("");
+  bar.classList.remove("hidden");
+}
+
+// 악보 확대 (핀치줌 보조 — 탭으로 전체화면)
+let stageZoomed = false;
+$("btn-member-zoom").onclick = ()=>{
+  stageZoomed = !stageZoomed;
+  $("btn-member-zoom").classList.toggle("on", stageZoomed);
+  const stage = $("stage");
+  if(stageZoomed){
+    stage.style.overflow = "auto";
+    stage.querySelectorAll("img").forEach(img=>{ img.style.maxHeight="none"; img.style.height="auto"; img.style.width="100%"; });
+    toast("스크롤로 악보를 탐색할 수 있어요");
+  }else{
+    stage.style.overflow = "hidden";
+    stage.querySelectorAll("img").forEach(img=>{ img.style.maxHeight=""; img.style.height=""; img.style.width=""; });
+  }
+  $("btn-member-zoom").textContent = stageZoomed ? "🔍 축소" : "🔍 확대";
+};
+
+// 팀원 펜 (내 화면만)
 let memberTool = null;
 function setMemberTool(t){
   memberTool = (memberTool === t) ? null : t;
@@ -1780,24 +1868,19 @@ function setMemberTool(t){
 }
 $("btn-member-draw").onclick = ()=>{
   buildPenModal();
-  $("modal-pen").classList.remove("hidden");
-  // 팀원 펜 모달: 확인 시 팀원 그리기 모드로
   $("btn-pen-start").onclick = ()=>{
     localStorage.setItem("praise_pen", JSON.stringify(pen));
     $("modal-pen").classList.add("hidden");
     setMemberTool("draw");
   };
+  $("modal-pen").classList.remove("hidden");
 };
 
-// 팀원 되돌리기 / 지우기
 $("btn-member-undo").onclick = ()=>{
   const key = annKeyCurrent();
   if(!key) return;
-  if(undoKey(key)){
-    toast("방금 표시를 되돌렸어요");
-  }else{
-    toast("되돌릴 표시가 없어요");
-  }
+  if(undoKey(key)) toast("되돌렸어요");
+  else toast("되돌릴 것이 없어요");
 };
 $("btn-member-erase").onclick = ()=>{
   document.querySelectorAll(".pane canvas").forEach(cv=>{
@@ -1805,10 +1888,8 @@ $("btn-member-erase").onclick = ()=>{
     state.ann[key] = { strokes:[], badges:[], order:[], textboxes:[] };
     drawAnn(cv);
   });
-  toast("내 화면의 표시를 지웠어요");
+  toast("내 화면 표시를 지웠어요");
 };
-
-// 팀원 2쪽 보기
 $("btn-member-duo").onclick = ()=>{
   state.duo = !state.duo;
   $("btn-duo").classList.toggle("on", state.duo);
@@ -1817,8 +1898,7 @@ $("btn-member-duo").onclick = ()=>{
   if(state.duo) toast("가로 화면에서 보면 더 좋아요");
 };
 
-// 팀원 펜 그리기: attachDrawing에서 memberTool도 처리하도록
-// (기존 attachDrawing은 리더 전용이므로 팀원용 별도 처리)
+// 팀원 펜 그리기 (내 화면 전용)
 function attachMemberDrawing(cv){
   let stroke = null;
   const norm = (e)=>{
@@ -1847,7 +1927,6 @@ function attachMemberDrawing(cv){
       const st = { p: stroke, c: pen.c, w: pen.w };
       const a = getAnn(key);
       a.strokes.push(st); a.order.push("s");
-      // 팀원 펜은 다른 사람에게 전송 안 함 (내 화면만)
     }
     stroke = null;
   });
@@ -1902,9 +1981,13 @@ async function enterRoom(room, role){
 $("btn-back").onclick = ()=>{
   if(channel){ channel.close(); channel = null; }
   if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
+  saveMemo();
+  $("memo-panel").classList.remove("open");
+  stageZoomed = false;
+  $("stage").style.overflow = "";
   $("screen-room").classList.add("hidden");
   $("screen-rooms").classList.remove("hidden");
-  loadRoomsList();   // 목록 최신화
+  loadRoomsList();
 };
 
 /* ---------------- 화면 꺼짐 방지 ---------------- */
@@ -2053,6 +2136,7 @@ function render(){
   const note = (song && song.note) ? song.note.trim() : "";
   $("note-bar").classList.toggle("hidden", !note);
   $("note-bar").textContent = note ? "📝 " + note : "";
+  updateSongInfoBar();
   renderSetlist();
 }
 
