@@ -400,6 +400,30 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
 /* ─── 반응형 / 기타 ─────────────────────────── */
 .clock{font-variant-numeric:tabular-nums}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* ─── 방 내부 탭 ─── */
+.room-tab{flex:1;padding:10px 4px;font-size:13px;font-weight:700;color:var(--muted);border-bottom:2px solid transparent;background:none;cursor:pointer;white-space:nowrap}
+.room-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+/* 기도 카드 */
+.pray-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:10px}
+.pray-card.answered{opacity:.6}
+.pray-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.pray-avatar{width:36px;height:36px;border-radius:50%;background:rgba(232,176,75,.15);border:1.5px solid rgba(232,176,75,.35);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:var(--accent);flex:none}
+.pray-meta{flex:1;min-width:0}
+.pray-author{font-size:14px;font-weight:700}
+.pray-date{font-size:12px;color:var(--muted)}
+.pray-content{font-size:15px;line-height:1.75;margin-bottom:12px;color:var(--ink)}
+.pray-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pray-btn{font-size:13px;font-weight:700;padding:7px 14px;border-radius:99px;border:1.5px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:5px}
+.pray-btn.prayed{border-color:rgba(232,176,75,.5);color:var(--accent);background:rgba(232,176,75,.1)}
+.pray-btn.answered-btn{border-color:rgba(74,222,128,.4);color:var(--ok);background:rgba(74,222,128,.08)}
+/* 공지 카드 */
+.notice-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:10px}
+.notice-card.pinned{border-color:rgba(232,176,75,.4)}
+.notice-card-title{font-size:17px;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.notice-card-content{font-size:14px;line-height:1.75;color:var(--ink);white-space:pre-wrap}
+.notice-card-meta{font-size:12px;color:var(--muted);margin-top:10px;display:flex;justify-content:space-between;align-items:center}
+#screen-room{display:flex;flex-direction:column}
+#rtab-sheet{display:flex;flex-direction:column;flex:1;min-height:0}
 </style>
 </head>
 <body>
@@ -446,35 +470,51 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
   <div id="mode-banner" class="local hidden"></div>
 
   <div id="pages">
-    <!-- ── 홈 ── -->
+    <!-- ── 홈 (방 목록) ── -->
     <div class="page on" id="page-home">
       <div class="home-hero">
         <div class="greeting">안녕하세요, <span id="home-name">팀원</span>님 👋</div>
         <div class="date-str" id="home-date"></div>
       </div>
-      <div class="page-inner">
-        <div class="section">
-          <div class="quick-row">
-            <div class="quick-card" id="qc-sheet"><div class="qc-ico">🎼</div><div class="qc-label">악보</div></div>
-            <div class="quick-card" id="qc-sched"><div class="qc-ico">📅</div><div class="qc-label">일정</div></div>
-            <div class="quick-card" id="qc-prayer"><div class="qc-ico">🙏</div><div class="qc-label">기도제목</div></div>
+      <div class="page-inner" style="padding:16px 16px 24px">
+        <!-- 방 만들기 / 코드 입장 -->
+        <div class="btn-row" style="margin-bottom:14px">
+          <button class="btn primary" id="btn-show-create">＋ 방 만들기</button>
+          <button class="btn" id="btn-show-join">🔑 코드 입장</button>
+        </div>
+        <div class="card hidden" id="panel-create" style="margin-bottom:14px">
+          <div class="card-title">방 만들기</div>
+          <input id="create-name" class="field" placeholder="팀 이름 (예: 4부 찬양팀)" maxlength="20" style="margin-bottom:8px"/>
+          <input id="create-pass" class="field" type="password" placeholder="비밀번호 (없으면 빈칸)" maxlength="20" style="margin-bottom:8px"/>
+          <div class="btn-row">
+            <button class="btn primary" id="btn-create">만들기</button>
+            <button class="btn ghost" id="btn-create-cancel">취소</button>
           </div>
         </div>
-        <div class="section">
-          <div class="section-head"><h2>다가오는 일정</h2><span class="more" id="home-more-sched">전체 보기</span></div>
-          <div class="card" id="home-schedules"><div style="color:var(--muted);font-size:14px">불러오는 중...</div></div>
+        <div class="card hidden" id="panel-join" style="margin-bottom:14px">
+          <div class="card-title">코드로 입장</div>
+          <input id="join-code" class="field" placeholder="입장 코드 (6자리)" maxlength="6" autocapitalize="characters" style="text-transform:uppercase;margin-bottom:8px"/>
+          <input id="join-name" class="field" placeholder="내 이름" maxlength="12" style="margin-bottom:8px"/>
+          <div class="role-row" style="margin-bottom:8px">
+            <button class="role-btn" id="role-leader">🎤 리더</button>
+            <button class="role-btn sel" id="role-member">🎵 팀원</button>
+            <button class="role-btn" id="role-accomp">🎹 반주자</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="btn-join">입장하기</button>
+            <button class="btn ghost" id="btn-join-cancel">취소</button>
+          </div>
         </div>
-        <div class="section">
-          <div class="section-head"><h2>기도제목</h2><span class="more" id="home-more-prayer">전체 보기</span></div>
-          <div class="card" id="home-prayers"><div style="color:var(--muted);font-size:14px">불러오는 중...</div></div>
+        <!-- 탭: 전체 / 내 방 -->
+        <div style="display:flex;gap:0;margin-bottom:12px;border:1.5px solid var(--border);border-radius:var(--r-sm);overflow:hidden">
+          <button class="auth-tab sel" id="tab-all" style="flex:1">전체 팀</button>
+          <button class="auth-tab" id="tab-mine" style="flex:1">내 팀</button>
         </div>
-        <div class="section">
-          <div class="section-head"><h2>공지</h2></div>
-          <div class="card" id="home-notices"><div style="color:var(--muted);font-size:14px">불러오는 중...</div></div>
-        </div>
+        <div id="rooms-list"></div>
       </div>
     </div>
 
+    <!-- ── 악보 ── -->
     <!-- ── 악보 ── -->
     <div class="page" id="page-sheet">
       <div class="page-header">
@@ -589,9 +629,6 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
   <!-- 하단 탭 바 -->
   <div id="tab-bar">
     <button class="tab-item on" data-page="home"><div class="ti">🏠</div>홈</button>
-    <button class="tab-item" data-page="sheet"><div class="ti">🎼</div>악보</button>
-    <button class="tab-item" data-page="sched"><div class="ti">📅</div>일정</button>
-    <button class="tab-item" data-page="prayer"><div class="ti">🙏</div>기도</button>
     <button class="tab-item" data-page="more"><div class="ti">☰</div>더보기</button>
   </div>
 </div>
@@ -617,10 +654,19 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
     <button class="rtopbar-btn hidden" id="btn-settings">설정</button>
   </div>
 
-  <div class="note-bar hidden" id="note-bar"></div>
-  <div class="song-info-bar hidden" id="song-info-bar"></div>
+  <!-- 방 내부 탭 -->
+  <div id="room-tab-bar" style="display:flex;background:var(--surface);border-bottom:1px solid var(--border);flex:none">
+    <button class="room-tab on" data-rtab="sheet">🎼 악보</button>
+    <button class="room-tab" data-rtab="rsched">📅 일정</button>
+    <button class="room-tab" data-rtab="prayer">🙏 기도</button>
+    <button class="room-tab" data-rtab="notice">📢 공지</button>
+  </div>
 
-  <div class="stage-wrap">
+  <!-- 악보 패널 -->
+  <div id="rtab-sheet" style="flex:1;display:flex;flex-direction:column;min-height:0">
+    <div class="note-bar hidden" id="note-bar"></div>
+    <div class="song-info-bar hidden" id="song-info-bar"></div>
+    <div class="stage-wrap">
     <div class="stage" id="stage"></div>
     <div class="memo-panel" id="memo-panel">
       <div class="memo-panel-head">
@@ -629,9 +675,56 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
       </div>
       <textarea id="memo-panel-text" placeholder="나만 보이는 메모&#10;예) G키 / 88BPM&#10;2절 후 간주 한 번 더"></textarea>
     </div>
+  </div><!-- stage-wrap -->
+  </div><!-- rtab-sheet -->
+
+  <!-- 일정 패널 -->
+  <div id="rtab-rsched" style="flex:1;overflow-y:auto;display:none">
+    <div style="padding:16px;max-width:520px;margin:0 auto">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button class="btn icon-btn" id="btn-add-rsched">＋ 일정 추가</button>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="cal-nav"><button id="rcal-prev">◀</button><h3 id="rcal-title"></h3><button id="rcal-next">▶</button></div>
+        <div class="calendar-grid" id="rcal-head"></div>
+        <div class="calendar-grid" id="rcal-grid"></div>
+      </div>
+      <div id="rsched-list"></div>
+    </div>
   </div>
 
-  <div class="room-bottom">
+  <!-- 기도제목 패널 -->
+  <div id="rtab-prayer" style="flex:1;overflow-y:auto;display:none">
+    <div style="padding:16px;max-width:520px;margin:0 auto">
+      <div class="card" style="margin-bottom:14px;background:rgba(232,176,75,.08);border-color:rgba(232,176,75,.3)">
+        <div class="card-title" style="color:var(--accent)">✨ 이번 주 기도 제목</div>
+        <div id="weekly-prayer-text" style="font-size:15px;line-height:1.7;color:var(--ink)">아직 등록되지 않았어요</div>
+        <button class="btn ghost" id="btn-edit-weekly" style="font-size:13px;margin-top:8px;padding:6px 0;text-align:left;color:var(--accent);display:none">✏️ 수정 (리더)</button>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:16px;font-weight:800">팀원 기도제목</div>
+        <button class="btn icon-btn" id="btn-add-rprayer">🙏 작성</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;scrollbar-width:none">
+        <button class="msg-chip accent" data-pfilter="all">전체</button>
+        <button class="msg-chip" data-pfilter="active">기도 중</button>
+        <button class="msg-chip" data-pfilter="answered">응답됨 ✓</button>
+      </div>
+      <div id="rprayer-list"></div>
+    </div>
+  </div>
+
+  <!-- 공지 패널 -->
+  <div id="rtab-notice" style="flex:1;overflow-y:auto;display:none">
+    <div style="padding:16px;max-width:520px;margin:0 auto">
+      <div id="rnotice-leader-btn" style="display:none;margin-bottom:12px">
+        <button class="btn primary" id="btn-add-rnotice">📢 공지 작성</button>
+      </div>
+      <div id="rnotice-list"></div>
+    </div>
+  </div>
+
+  <div class="room-bottom" id="room-bottom">
     <!-- 리더: 메시지 칩 -->
     <div class="msg-chips hidden" id="msg-row"></div>
     <!-- 넘김 -->
@@ -889,6 +982,23 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
   <div class="drawer-body" id="setlist"></div>
 </div>
 
+<!-- 공지 작성 -->
+<div class="modal-veil" id="modal-add-notice">
+  <div class="modal-box">
+    <div class="modal-title">📢 공지 작성</div>
+    <label class="field-label">제목</label>
+    <input id="notice-title-input" class="field" placeholder="공지 제목" maxlength="40"/>
+    <label class="field-label">내용</label>
+    <textarea id="notice-content-input" class="field" style="min-height:120px" placeholder="공지 내용을 입력하세요"></textarea>
+    <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer">
+      <input id="notice-pin-check" type="checkbox" style="width:18px;height:18px"/>
+      📌 상단 고정
+    </label>
+    <button class="btn primary" id="btn-notice-save">등록하기</button>
+    <button class="btn ghost" id="btn-notice-cancel">취소</button>
+  </div>
+</div>
+
 <!-- 앱 설치 안내 -->
 <div class="modal-veil" id="modal-install">
   <div class="modal-box">
@@ -1123,15 +1233,13 @@ function switchPage(id){
   $("page-"+id)?.classList.add("on");
   document.querySelectorAll(".tab-item").forEach(b=>b.classList.toggle("on",b.dataset.page===id));
   if(id==="sched") renderCalendar();
-  if(id==="prayer") loadPrayers();
-  if(id==="home") loadHome();
 }
 document.querySelectorAll(".tab-item").forEach(b=>b.addEventListener("click",()=>switchPage(b.dataset.page)));
-$("qc-sheet").onclick=()=>switchPage("sheet");
-$("qc-sched").onclick=()=>switchPage("sched");
-$("qc-prayer").onclick=()=>switchPage("prayer");
-$("home-more-sched").onclick=()=>switchPage("sched");
-$("home-more-prayer").onclick=()=>switchPage("prayer");
+// removed
+// removed
+// removed
+// removed
+// removed
 
 /* ═══════════════════════════════════════════════════
    인증 화면
@@ -1184,7 +1292,7 @@ function enterApp(u){
   const now=new Date();
   $("home-date").textContent=now.toLocaleDateString("ko-KR",{year:"numeric",month:"long",day:"numeric",weekday:"long"});
   loadRoomsList();
-  loadHome();
+  
   startClock();
   initPWA();
   applyBranding();
@@ -1307,51 +1415,6 @@ function applyBranding(){
 /* ═══════════════════════════════════════════════════
    홈 로드
 ═══════════════════════════════════════════════════ */
-async function loadHome(){
-  // 일정
-  try{
-    const scheds=await api.listSchedules();
-    const upcoming=scheds.filter(s=>s.date>=todayStr()).slice(0,3);
-    const box=$("home-schedules");
-    if(!upcoming.length){ box.innerHTML=`<div style="color:var(--muted);font-size:14px;text-align:center;padding:12px">다가오는 일정이 없어요</div>`; }
-    else box.innerHTML=upcoming.map(s=>`
-      <div class="schedule-item">
-        <div class="sched-dot ${s.type}"></div>
-        <div class="sched-body">
-          <div class="sched-title">${s.title}</div>
-          <div class="sched-meta">${fmtDate(s.date)}${s.start_time?" · "+s.start_time:""}</div>
-        </div>
-        <span class="sched-badge ${s.type}">${s.type==="practice"?"연습":s.type==="worship"?"예배":"행사"}</span>
-      </div>`).join("");
-  }catch(e){}
-  // 기도
-  try{
-    const prayers=await api.listPrayers();
-    const recent=prayers.filter(p=>!p.is_answered).slice(0,2);
-    const pb=$("home-prayers");
-    if(!recent.length){ pb.innerHTML=`<div style="color:var(--muted);font-size:14px;text-align:center;padding:12px">등록된 기도제목이 없어요</div>`; }
-    else pb.innerHTML=recent.map(p=>`
-      <div class="prayer-item">
-        <div class="prayer-author">🙏 ${p.author||"익명"}</div>
-        <div class="prayer-content">${p.content}</div>
-      </div>`).join("");
-  }catch(e){}
-  // 공지
-  try{
-    const notices=await api.listNotices();
-    const nb=$("home-notices");
-    if(!notices.length){ nb.innerHTML=`<div style="color:var(--muted);font-size:14px;text-align:center;padding:12px">공지가 없어요</div>`; }
-    else nb.innerHTML=notices.slice(0,3).map(n=>`
-      <div class="notice-item">
-        <div class="notice-pin">${n.is_pinned?"📌":"📄"}</div>
-        <div class="notice-body">
-          <div class="notice-title">${n.title}</div>
-          <div class="notice-date">${n.created_at?.slice(0,10)||""}</div>
-        </div>
-      </div>`).join("");
-  }catch(e){}
-}
-
 /* ═══════════════════════════════════════════════════
    일정 탭
 ═══════════════════════════════════════════════════ */
@@ -1404,7 +1467,7 @@ async function loadSchedules(){
     </div>`).join("");
 }
 
-async function deleteSched(id){ await api.deleteSchedule(id); loadSchedules(); loadHome(); toast("일정을 삭제했어요"); }
+async function deleteSched(id){ await api.deleteSchedule(id); loadSchedules();  toast("일정을 삭제했어요"); }
 
 // 일정 추가
 let schedType="practice";
@@ -1423,7 +1486,7 @@ $("btn-sched-save").onclick=async()=>{
   await api.addSchedule(s);
   btn.disabled=false;
   closeModal("modal-add-sched");
-  renderCalendar(); loadHome();
+  renderCalendar(); 
   toast("일정을 추가했어요");
   [$("sched-title"),$("sched-start"),$("sched-end"),$("sched-loc"),$("sched-note")].forEach(el=>el.value="");
 };
@@ -1449,8 +1512,8 @@ async function loadPrayers(){
       </div>
     </div>`).join("");
 }
-async function togglePrayer(id){ await api.togglePrayer(id); loadPrayers(); loadHome(); }
-async function deletePrayer(id){ await api.deletePrayer(id); loadPrayers(); loadHome(); toast("삭제했어요"); }
+async function togglePrayer(id){ await api.togglePrayer(id);   }
+async function deletePrayer(id){ await api.deletePrayer(id);   toast("삭제했어요"); }
 
 $("btn-add-prayer").onclick=()=>showModal("modal-add-prayer");
 $("btn-prayer-cancel").onclick=()=>closeModal("modal-add-prayer");
@@ -1463,7 +1526,7 @@ $("btn-prayer-save").onclick=async()=>{
   btn.disabled=false;
   closeModal("modal-add-prayer");
   $("prayer-content").value="";
-  loadPrayers(); loadHome();
+   
   toast("기도제목을 등록했어요");
 };
 
@@ -2170,6 +2233,265 @@ const installRow=document.createElement("div"); installRow.className="settings-r
 installRow.onclick=()=>{ const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent); $("install-ios").classList.toggle("hidden",!isIOS); $("install-android").classList.toggle("hidden",isIOS); showModal("modal-install"); };
 $("btn-install-close").onclick=()=>closeModal("modal-install");
 $("more-user-info").insertAdjacentElement("afterend",installRow);
+
+/* ═══════════════════════════════════════════════════
+   방 내부 탭 전환
+═══════════════════════════════════════════════════ */
+let currentRoomTab = "sheet";
+function switchRoomTab(id){
+  currentRoomTab = id;
+  document.querySelectorAll(".room-tab").forEach(b=>b.classList.toggle("on", b.dataset.rtab===id));
+  ["sheet","rsched","prayer","notice"].forEach(t=>{
+    const el=$("rtab-"+t);
+    if(el) el.style.display = t===id ? (t==="sheet"?"flex":"block") : "none";
+  });
+  // 하단 컨트롤: 악보 탭일 때만 표시
+  $("room-bottom").style.display = id==="sheet" ? "" : "none";
+  if(id==="rsched") loadRSchedules();
+  if(id==="prayer") loadRPrayers();
+  if(id==="notice") loadRNotices();
+}
+document.querySelectorAll(".room-tab").forEach(b=>b.addEventListener("click",()=>switchRoomTab(b.dataset.rtab)));
+
+/* ═══════════════════════════════════════════════════
+   enterRoom 패치 — 탭 초기화 + 리더 권한 표시
+═══════════════════════════════════════════════════ */
+const _origEnterRoom = enterRoom;
+enterRoom = async function(room, role){
+  await _origEnterRoom(room, role);
+  switchRoomTab("sheet");
+  // 리더면 공지 작성 버튼 표시
+  const lb=$("rnotice-leader-btn");
+  if(lb) lb.style.display = role==="leader" ? "" : "none";
+  // 리더면 이번 주 기도 수정 버튼 표시
+  const wb=$("btn-edit-weekly");
+  if(wb) wb.style.display = role==="leader" ? "" : "none";
+  loadWeeklyPrayer();
+};
+
+/* ═══════════════════════════════════════════════════
+   방별 백엔드 헬퍼
+═══════════════════════════════════════════════════ */
+function roomId(){ return state.room?.id||null; }
+
+// 로컬 모드: room_id 기반 필터
+demo.listRSchedules=async function(rid){ return (await this.listSchedules()).filter(s=>s.room_id===rid); };
+demo.addRSchedule=async function(s){ s.room_id=roomId(); return await this.addSchedule(s); };
+demo.deleteRSchedule=async function(id){ return await this.deleteSchedule(id); };
+demo.listRPrayers=async function(rid){ return (await this.listPrayers()).filter(p=>p.room_id===rid); };
+demo.addRPrayer=async function(p){ p.room_id=roomId(); return await this.addPrayer(p); };
+demo.toggleRPrayer=async function(id){ return await this.togglePrayer(id); };
+demo.addPrayCount=async function(id){
+  const list=await this.listPrayers(); const p=list.find(x=>x.id===id);
+  if(p){p.pray_count=(p.pray_count||0)+1; localStorage.setItem("praise_prayers",JSON.stringify(list));} return p;
+};
+demo.deleteRPrayer=async function(id){ return await this.deletePrayer(id); };
+demo.listRNotices=async function(rid){ return (await this.listNotices()).filter(n=>n.room_id===rid); };
+demo.addRNotice=async function(n){ n.room_id=roomId(); return await this.addNotice(n); };
+demo.deleteRNotice=async function(id){
+  const list=(await this.listNotices()).filter(n=>n.id!==id);
+  localStorage.setItem("praise_notices",JSON.stringify(list));
+};
+demo.getWeeklyPrayer=async function(rid){ try{ return JSON.parse(localStorage.getItem("praise_weekly_"+rid)||"null"); }catch(e){return null;} };
+demo.setWeeklyPrayer=async function(rid,text){ localStorage.setItem("praise_weekly_"+rid,JSON.stringify({text,updated_at:new Date().toISOString()})); };
+
+// 클라우드 모드
+cloud.listRSchedules=async function(rid){ const {data}=await sb.from("praise_schedules").select().eq("room_id",rid).order("date").order("start_time"); return data||[]; };
+cloud.addRSchedule=async function(s){ s.room_id=roomId(); const {data,error}=await sb.from("praise_schedules").insert(s).select().single(); if(error){toast("저장 실패");return null;} return data; };
+cloud.deleteRSchedule=async function(id){ await sb.from("praise_schedules").delete().eq("id",id); };
+cloud.listRPrayers=async function(rid){ const {data}=await sb.from("praise_prayers").select().eq("room_id",rid).order("created_at",{ascending:false}); return data||[]; };
+cloud.addRPrayer=async function(p){ p.room_id=roomId(); const {data,error}=await sb.from("praise_prayers").insert(p).select().single(); if(error){toast("저장 실패");return null;} return data; };
+cloud.toggleRPrayer=async function(id){ const {data}=await sb.from("praise_prayers").select("is_answered").eq("id",id).single(); if(data)await sb.from("praise_prayers").update({is_answered:!data.is_answered}).eq("id",id); };
+cloud.addPrayCount=async function(id){ await sb.from("praise_prayers").rpc("increment_pray_count",{row_id:id}).catch(async()=>{ const {data}=await sb.from("praise_prayers").select("pray_count").eq("id",id).single(); if(data)await sb.from("praise_prayers").update({pray_count:(data.pray_count||0)+1}).eq("id",id); }); };
+cloud.deleteRPrayer=async function(id){ await sb.from("praise_prayers").delete().eq("id",id); };
+cloud.listRNotices=async function(rid){ const {data}=await sb.from("praise_notices").select().eq("room_id",rid).order("is_pinned",{ascending:false}).order("created_at",{ascending:false}); return data||[]; };
+cloud.addRNotice=async function(n){ n.room_id=roomId(); const {data,error}=await sb.from("praise_notices").insert(n).select().single(); if(error){toast("저장 실패");return null;} return data; };
+cloud.deleteRNotice=async function(id){ await sb.from("praise_notices").delete().eq("id",id); };
+cloud.getWeeklyPrayer=async function(rid){ try{ const {data}=await sb.from("praise_settings").select("data").eq("id","weekly_"+rid).maybeSingle(); return data?.data||null; }catch(e){return null;} };
+cloud.setWeeklyPrayer=async function(rid,text){ await sb.from("praise_settings").upsert({id:"weekly_"+rid,data:{text,updated_at:new Date().toISOString()}}); };
+
+/* ═══════════════════════════════════════════════════
+   일정 (방 안)
+═══════════════════════════════════════════════════ */
+let rcalYear=new Date().getFullYear(), rcalMonth=new Date().getMonth();
+function renderRCal(){
+  const d=new Date(rcalYear,rcalMonth,1);
+  $("rcal-title").textContent=`${rcalYear}년 ${rcalMonth+1}월`;
+  $("rcal-head").innerHTML=DAYS.map(d=>`<div class="cal-head">${d}</div>`).join("");
+  const startDay=d.getDay(), daysInMonth=new Date(rcalYear,rcalMonth+1,0).getDate();
+  const today=todayStr(); let html="";
+  for(let i=0;i<startDay;i++) html+=`<div class="cal-day other"><span class="dn"></span></div>`;
+  for(let i=1;i<=daysInMonth;i++){
+    const ds=`${rcalYear}-${String(rcalMonth+1).padStart(2,"0")}-${String(i).padStart(2,"0")}`;
+    html+=`<div class="cal-day${ds===today?" today":""}" data-date="${ds}"><span class="dn">${i}</span></div>`;
+  }
+  $("rcal-grid").innerHTML=html;
+}
+$("rcal-prev").onclick=()=>{ rcalMonth--; if(rcalMonth<0){rcalMonth=11;rcalYear--;} renderRCal(); loadRSchedules(); };
+$("rcal-next").onclick=()=>{ rcalMonth++; if(rcalMonth>11){rcalMonth=0;rcalYear++;} renderRCal(); loadRSchedules(); };
+
+async function loadRSchedules(){
+  if(!state.room) return;
+  renderRCal();
+  const list=await api.listRSchedules(roomId());
+  // 달력 점
+  document.querySelectorAll("#rcal-grid .cal-day").forEach(d=>{ if(list.some(s=>s.date===d.dataset.date))d.classList.add("has-event"); });
+  const prefix=`${rcalYear}-${String(rcalMonth+1).padStart(2,"0")}`;
+  const filtered=list.filter(s=>s.date?.startsWith(prefix));
+  const box=$("rsched-list");
+  if(!filtered.length){ box.innerHTML=`<div style="color:var(--muted);text-align:center;padding:32px;font-size:14px">이번 달 일정이 없어요</div>`; return; }
+  box.innerHTML=filtered.map(s=>`
+    <div class="card" style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span class="sched-badge ${s.type}">${s.type==="practice"?"연습":s.type==="worship"?"예배":"행사"}</span>
+        <span style="font-weight:800;font-size:16px;flex:1">${s.title}</span>
+        ${state.role==="leader"?`<button class="si-mini" style="color:var(--danger)" onclick="delRSched('${s.id}')">삭제</button>`:""}
+      </div>
+      <div style="font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:4px">
+        <span>📅 ${fmtDate(s.date)}</span>
+        ${s.start_time?`<span>🕐 ${s.start_time}${s.end_time?" ~ "+s.end_time:""}</span>`:""}
+        ${s.location?`<span>📍 ${s.location}</span>`:""}
+        ${s.note?`<span style="color:var(--ink);margin-top:4px">${s.note}</span>`:""}
+      </div>
+    </div>`).join("");
+}
+async function delRSched(id){ await api.deleteRSchedule(id); loadRSchedules(); toast("삭제했어요"); }
+
+$("btn-add-rsched").onclick=()=>{
+  if(state.role!=="leader") return toast("리더만 일정을 추가할 수 있어요");
+  $("sched-date").value=todayStr(); showModal("modal-add-sched");
+};
+// 일정 저장 — 방 ID 포함
+const _origSchedSave = $("btn-sched-save").onclick;
+$("btn-sched-save").onclick=async()=>{
+  const title=$("sched-title").value.trim(), date=$("sched-date").value;
+  if(!title||!date) return toast("제목과 날짜를 입력하세요");
+  const u=currentUser();
+  const s={title,type:schedType,date,start_time:$("sched-start").value||null,end_time:$("sched-end").value||null,location:$("sched-loc").value.trim()||null,note:$("sched-note").value.trim()||"",created_by:u?.nickname||u?.name||"리더"};
+  const btn=$("btn-sched-save"); btn.disabled=true;
+  await api.addRSchedule(s);
+  btn.disabled=false; closeModal("modal-add-sched");
+  [$("sched-title"),$("sched-start"),$("sched-end"),$("sched-loc"),$("sched-note")].forEach(el=>el.value="");
+  loadRSchedules(); toast("일정을 추가했어요");
+};
+
+/* ═══════════════════════════════════════════════════
+   기도제목 (방 안)
+═══════════════════════════════════════════════════ */
+let prayFilter="all";
+document.querySelectorAll("[data-pfilter]").forEach(b=>b.addEventListener("click",()=>{
+  prayFilter=b.dataset.pfilter;
+  document.querySelectorAll("[data-pfilter]").forEach(x=>x.classList.toggle("accent",x===b));
+  loadRPrayers();
+}));
+
+// 이번 주 기도제목 (방별 설정에 저장)
+async function loadWeeklyPrayer(){
+  if(!state.room) return;
+  const data=await api.getWeeklyPrayer(roomId()).catch(()=>null);
+  $("weekly-prayer-text").textContent=data?.text||"아직 등록되지 않았어요";
+}
+$("btn-edit-weekly").onclick=()=>{
+  const current=$("weekly-prayer-text").textContent;
+  const text=prompt("이번 주 기도 제목:",current==="아직 등록되지 않았어요"?"":current);
+  if(text===null) return;
+  api.setWeeklyPrayer(roomId(),text).then(()=>{ loadWeeklyPrayer(); toast("저장했어요"); });
+};
+
+async function loadRPrayers(){
+  if(!state.room) return;
+  const all=await api.listRPrayers(roomId());
+  const list=prayFilter==="all"?all:prayFilter==="answered"?all.filter(p=>p.is_answered):all.filter(p=>!p.is_answered);
+  const box=$("rprayer-list");
+  if(!list.length){ box.innerHTML=`<div style="color:var(--muted);text-align:center;padding:40px;font-size:14px">기도제목이 없어요<br/>🙏 작성 버튼으로 등록해보세요</div>`; return; }
+  const u=currentUser();
+  const myName=u?.nickname||u?.name||localStorage.getItem("praise_name")||"";
+  box.innerHTML=list.map(p=>{
+    const initial=(p.author||"?")[0].toUpperCase();
+    const canDel=state.role==="leader"||p.author===myName;
+    return `<div class="pray-card${p.is_answered?" answered":""}">
+      <div class="pray-header">
+        <div class="pray-avatar">${initial}</div>
+        <div class="pray-meta">
+          <div class="pray-author">${p.author||"익명"} ${p.is_answered?'<span style="font-size:11px;padding:2px 7px;border-radius:99px;background:rgba(74,222,128,.15);color:var(--ok)">응답됨 ✓</span>':""}</div>
+          <div class="pray-date">${p.created_at?.slice(0,10)||""}</div>
+        </div>
+      </div>
+      <div class="pray-content">${p.content}</div>
+      <div class="pray-actions">
+        <button class="pray-btn${p.pray_count>0?" prayed":""}" onclick="doPrayCount('${p.id}')">🙏 함께 기도 ${p.pray_count>0?`<span style="font-weight:800">${p.pray_count}</span>`:""}
+        </button>
+        <button class="pray-btn answered-btn" onclick="doTogglePrayer('${p.id}')">${p.is_answered?"↩ 미응답":"✓ 응답됨"}</button>
+        ${canDel?`<button class="pray-btn" style="color:var(--danger);border-color:rgba(248,113,113,.3)" onclick="doDelPrayer('${p.id}')">삭제</button>`:""}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function doPrayCount(id){
+  await api.addPrayCount(id).catch(()=>{});
+  loadRPrayers();
+  try{ navigator.vibrate&&navigator.vibrate(60); }catch(e){}
+  toast("🙏 함께 기도했어요");
+}
+async function doTogglePrayer(id){ await api.toggleRPrayer(id); loadRPrayers(); toast("상태를 변경했어요"); }
+async function doDelPrayer(id){ await api.deleteRPrayer(id); loadRPrayers(); toast("삭제했어요"); }
+
+$("btn-add-rprayer").onclick=()=>showModal("modal-add-prayer");
+// 기도 저장 — 방 ID 포함
+$("btn-prayer-save").onclick=async()=>{
+  const content=$("prayer-content").value.trim();
+  if(!content) return toast("내용을 입력해주세요");
+  const u=currentUser();
+  const btn=$("btn-prayer-save"); btn.disabled=true;
+  await api.addRPrayer({author:u?.nickname||u?.name||localStorage.getItem("praise_name")||"익명",content,pray_count:0});
+  btn.disabled=false; closeModal("modal-add-prayer");
+  $("prayer-content").value="";
+  loadRPrayers(); toast("기도제목을 등록했어요 🙏");
+};
+
+/* ═══════════════════════════════════════════════════
+   공지사항 (방 안, 리더만 작성)
+═══════════════════════════════════════════════════ */
+async function loadRNotices(){
+  if(!state.room) return;
+  const list=await api.listRNotices(roomId());
+  const box=$("rnotice-list");
+  if(!list.length){ box.innerHTML=`<div style="color:var(--muted);text-align:center;padding:40px;font-size:14px">공지사항이 없어요</div>`; return; }
+  box.innerHTML=list.map(n=>`
+    <div class="notice-card${n.is_pinned?" pinned":""}">
+      <div class="notice-card-title">
+        ${n.is_pinned?"📌":"📄"} ${n.title}
+      </div>
+      <div class="notice-card-content">${n.content}</div>
+      <div class="notice-card-meta">
+        <span>${n.created_by||"리더"} · ${n.created_at?.slice(0,10)||""}</span>
+        ${state.role==="leader"?`<button class="si-mini" style="color:var(--danger)" onclick="delRNotice('${n.id}')">삭제</button>`:""}
+      </div>
+    </div>`).join("");
+}
+async function delRNotice(id){ await api.deleteRNotice(id); loadRNotices(); toast("삭제했어요"); }
+
+$("btn-add-rnotice").onclick=()=>{
+  if(state.role!=="leader") return;
+  showModal("modal-add-notice");
+  setTimeout(()=>$("notice-title-input")?.focus(),120);
+};
+$("btn-notice-save").onclick=async()=>{
+  const title=$("notice-title-input").value.trim();
+  const content=$("notice-content-input").value.trim();
+  if(!title||!content) return toast("제목과 내용을 입력하세요");
+  const u=currentUser();
+  const pinned=$("notice-pin-check").checked;
+  const btn=$("btn-notice-save"); btn.disabled=true;
+  await api.addRNotice({title,content,is_pinned:pinned,created_by:u?.nickname||u?.name||"리더"});
+  btn.disabled=false; closeModal("modal-add-notice");
+  $("notice-title-input").value=""; $("notice-content-input").value=""; $("notice-pin-check").checked=false;
+  loadRNotices(); toast("공지를 등록했어요");
+};
+$("btn-notice-cancel").onclick=()=>closeModal("modal-add-notice");
+
+
 
 </script>
 </body>
