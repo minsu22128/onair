@@ -119,18 +119,15 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
 /* ─── 모달 ──────────────────────────────────── */
 .modal-veil{
   position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;
-  display:flex;align-items:flex-end;justify-content:center;
-  opacity:0;pointer-events:none;transition:opacity .2s;
+  display:none;align-items:flex-end;justify-content:center;
 }
-.modal-veil.show{opacity:1;pointer-events:auto}
+.modal-veil.show{display:flex}
 .modal-box{
   width:100%;max-width:520px;background:var(--surface);
   border-radius:20px 20px 0 0;padding:24px 20px calc(20px + env(safe-area-inset-bottom));
   display:flex;flex-direction:column;gap:12px;
-  transform:translateY(30px);transition:transform .25s ease;
   max-height:85dvh;overflow-y:auto;
 }
-.modal-veil.show .modal-box{transform:translateY(0)}
 .modal-title{font-size:18px;font-weight:800;margin-bottom:4px}
 .modal-sub{font-size:13px;color:var(--muted);margin-bottom:4px}
 
@@ -1409,8 +1406,14 @@ $("btn-font-close").onclick=()=>closeModal("modal-font");
 /* ═══════════════════════════════════════════════════
    모달 헬퍼
 ═══════════════════════════════════════════════════ */
-function showModal(id){ $(id).classList.add("show"); }
-function closeModal(id){ $(id).classList.remove("show"); }
+function showModal(id){
+  const el=$(id); if(!el) return;
+  el.classList.add("show");
+  // 모달 열릴 때 스크롤 맨 위로
+  const box=el.querySelector(".modal-box");
+  if(box) box.scrollTop=0;
+}
+function closeModal(id){ const el=$(id); if(el) el.classList.remove("show"); }
 document.querySelectorAll(".modal-veil").forEach(v=>{
   v.addEventListener("click",e=>{ if(e.target===v) v.classList.remove("show"); });
 });
@@ -2405,15 +2408,15 @@ demo.setWeeklyPrayer=async function(rid,text){ localStorage.setItem("praise_week
 
 // 클라우드 모드
 cloud.listRSchedules=async function(rid){ const {data}=await sb.from("praise_schedules").select().eq("room_id",rid).order("date").order("start_time"); return data||[]; };
-cloud.addRSchedule=async function(s){ s.room_id=roomId(); const {data,error}=await sb.from("praise_schedules").insert(s).select().single(); if(error){toast("저장 실패");return null;} return data; };
+cloud.addRSchedule=async function(s){ s.room_id=roomId(); if(!s.room_id){toast("방에 입장한 상태에서 추가해주세요");return null;} const {data,error}=await sb.from("praise_schedules").insert(s).select().single(); if(error){toast("저장 실패: "+error.message);return null;} return data; };
 cloud.deleteRSchedule=async function(id){ await sb.from("praise_schedules").delete().eq("id",id); };
 cloud.listRPrayers=async function(rid){ const {data}=await sb.from("praise_prayers").select().eq("room_id",rid).order("created_at",{ascending:false}); return data||[]; };
-cloud.addRPrayer=async function(p){ p.room_id=roomId(); const {data,error}=await sb.from("praise_prayers").insert(p).select().single(); if(error){toast("저장 실패");return null;} return data; };
+cloud.addRPrayer=async function(p){ p.room_id=roomId(); if(!p.room_id){toast("방에 입장한 상태에서 추가해주세요");return null;} const {data,error}=await sb.from("praise_prayers").insert(p).select().single(); if(error){toast("저장 실패: "+error.message);return null;} return data; };
 cloud.toggleRPrayer=async function(id){ const {data}=await sb.from("praise_prayers").select("is_answered").eq("id",id).single(); if(data)await sb.from("praise_prayers").update({is_answered:!data.is_answered}).eq("id",id); };
 cloud.addPrayCount=async function(id){ await sb.from("praise_prayers").rpc("increment_pray_count",{row_id:id}).catch(async()=>{ const {data}=await sb.from("praise_prayers").select("pray_count").eq("id",id).single(); if(data)await sb.from("praise_prayers").update({pray_count:(data.pray_count||0)+1}).eq("id",id); }); };
 cloud.deleteRPrayer=async function(id){ await sb.from("praise_prayers").delete().eq("id",id); };
 cloud.listRNotices=async function(rid){ const {data}=await sb.from("praise_notices").select().eq("room_id",rid).order("is_pinned",{ascending:false}).order("created_at",{ascending:false}); return data||[]; };
-cloud.addRNotice=async function(n){ n.room_id=roomId(); const {data,error}=await sb.from("praise_notices").insert(n).select().single(); if(error){toast("저장 실패");return null;} return data; };
+cloud.addRNotice=async function(n){ n.room_id=roomId(); if(!n.room_id){toast("방에 입장한 상태에서 추가해주세요");return null;} const {data,error}=await sb.from("praise_notices").insert(n).select().single(); if(error){toast("저장 실패: "+error.message);return null;} return data; };
 cloud.deleteRNotice=async function(id){ await sb.from("praise_notices").delete().eq("id",id); };
 cloud.getWeeklyPrayer=async function(rid){ try{ const {data}=await sb.from("praise_settings").select("data").eq("id","weekly_"+rid).maybeSingle(); return data?.data||null; }catch(e){return null;} };
 cloud.setWeeklyPrayer=async function(rid,text){ await sb.from("praise_settings").upsert({id:"weekly_"+rid,data:{text,updated_at:new Date().toISOString()}}); };
