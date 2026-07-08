@@ -133,11 +133,12 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
 
 /* ─── 토스트 ─────────────────────────────────── */
 #toast{
-  position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(16px);
-  background:rgba(30,36,52,.97);border:1px solid var(--border);color:var(--ink);
-  padding:11px 20px;border-radius:99px;font-size:14px;z-index:80;
+  position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-16px);
+  background:rgba(20,24,36,.97);border:1px solid var(--border);color:var(--ink);
+  padding:12px 22px;border-radius:99px;font-size:14px;z-index:200;
   opacity:0;transition:all .22s;pointer-events:none;white-space:nowrap;
-  max-width:min(88vw,420px);text-align:center;
+  max-width:min(88vw,420px);text-align:center;font-weight:600;
+  box-shadow:0 4px 24px rgba(0,0,0,.4);
 }
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
@@ -1054,9 +1055,9 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
 /* ═══════════════════════════════════════════════════
    ⚙️  설정 — 여기만 채우면 됩니다
 ═══════════════════════════════════════════════════ */
-const SUPABASE_URL      = "https://dgjotupusjfunwatxatw.supabase.co";
+const SUPABASE_URL = "https://dgjotupusjfunwatxatw.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRnam90dXB1c2pmdW53YXR4YXR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxNDUyMDcsImV4cCI6MjA5ODcyMTIwN30.gkIz1ZygkEyqADa_YFAlOZ5hAfvTSb5MeWM77ydNpko";
-const ADMIN_PIN         = "0000";
+const ADMIN_PIN = "4695";
 
 /* ═══════════════════════════════════════════════════
    기초
@@ -2386,19 +2387,19 @@ enterRoom = async function(room, role){
 function roomId(){ return state.room?.id||null; }
 
 // 로컬 모드: room_id 기반 필터
-demo.listRSchedules=async function(rid){ return (await this.listSchedules()).filter(s=>s.room_id===rid); };
-demo.addRSchedule=async function(s){ s.room_id=roomId(); return await this.addSchedule(s); };
-demo.deleteRSchedule=async function(id){ return await this.deleteSchedule(id); };
-demo.listRPrayers=async function(rid){ return (await this.listPrayers()).filter(p=>p.room_id===rid); };
-demo.addRPrayer=async function(p){ p.room_id=roomId(); return await this.addPrayer(p); };
-demo.toggleRPrayer=async function(id){ return await this.togglePrayer(id); };
+demo.listRSchedules=async function(rid){ return (await demo.listSchedules()).filter(s=>s.room_id===rid); };
+demo.addRSchedule=async function(s){ s.room_id=roomId(); return await demo.addSchedule(s); };
+demo.deleteRSchedule=async function(id){ return await demo.deleteSchedule(id); };
+demo.listRPrayers=async function(rid){ return (await demo.listPrayers()).filter(p=>p.room_id===rid); };
+demo.addRPrayer=async function(p){ p.room_id=roomId(); return await demo.addPrayer(p); };
+demo.toggleRPrayer=async function(id){ return await demo.togglePrayer(id); };
 demo.addPrayCount=async function(id){
   const list=await this.listPrayers(); const p=list.find(x=>x.id===id);
   if(p){p.pray_count=(p.pray_count||0)+1; localStorage.setItem("praise_prayers",JSON.stringify(list));} return p;
 };
-demo.deleteRPrayer=async function(id){ return await this.deletePrayer(id); };
-demo.listRNotices=async function(rid){ return (await this.listNotices()).filter(n=>n.room_id===rid); };
-demo.addRNotice=async function(n){ n.room_id=roomId(); return await this.addNotice(n); };
+demo.deleteRPrayer=async function(id){ return await demo.deletePrayer(id); };
+demo.listRNotices=async function(rid){ return (await demo.listNotices()).filter(n=>n.room_id===rid); };
+demo.addRNotice=async function(n){ n.room_id=roomId(); return await demo.addNotice(n); };
 demo.deleteRNotice=async function(id){
   const list=(await this.listNotices()).filter(n=>n.id!==id);
   localStorage.setItem("praise_notices",JSON.stringify(list));
