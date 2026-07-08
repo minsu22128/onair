@@ -752,11 +752,12 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
       <button class="tool-btn" id="btn-erase">지우기</button>
       <button class="tool-btn" id="btn-note">📝 멘트</button>
       <button class="tool-btn" id="btn-timer">⏱ 타이머</button>
-      <button class="tool-btn" id="btn-instrument">🎸 악기</button>
+      <button class="tool-btn" id="btn-instrument">🎸 이 곡 악기</button>
     </div>
     <!-- 팀원·반주자 도구 -->
     <div class="tool-row hidden" id="member-tool-row">
       <button class="tool-btn" id="btn-member-memo">📝 메모</button>
+      <button class="tool-btn" id="btn-member-instrument">🎸 이 곡 악기</button>
       <button class="tool-btn" id="btn-member-draw">✏️ 펜</button>
       <button class="tool-btn" id="btn-member-undo">↩</button>
       <button class="tool-btn" id="btn-member-erase">지우기</button>
@@ -1008,12 +1009,13 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
   </div>
 </div>
 
-<!-- 악기 세팅 메모 모달 -->
+<!-- 곡별 악기 세팅 메모 모달 -->
 <div class="modal-veil" id="modal-instrument">
   <div class="modal-box">
-    <div class="modal-title">🎸 악기 세팅 메모</div>
-    <div class="modal-sub">나만 보이는 메모입니다. 악기 세팅, 이펙터 설정 등을 적어두세요.</div>
-    <textarea id="instrument-text" class="field" style="min-height:160px" placeholder="예) 일렉: 리버브 3, 딜레이 1&#10;건반: Pad 음색 + 스트링&#10;드럼: 하이햇 반개방"></textarea>
+    <div class="modal-title">🎸 악기 세팅</div>
+    <div class="modal-sub" id="instrument-song-label"></div>
+    <textarea id="instrument-text" class="field" style="min-height:160px" placeholder="이 곡의 악기 세팅을 적어두세요&#10;예) 일렉: 리버브 3, 딜레이 1&#10;건반: Pad 음색 + 스트링&#10;드럼: 하이햇 반개방"></textarea>
+    <div style="font-size:12px;color:var(--muted)">나만 보이는 메모이며, 곡마다 따로 저장됩니다</div>
     <button class="btn primary" id="btn-instrument-save">저장</button>
     <button class="btn ghost" id="btn-instrument-close">닫기</button>
   </div>
@@ -2006,7 +2008,7 @@ function attachMemberDraw(cv){
   cv.addEventListener("pointermove",e=>{ if(!stroke)return; stroke.push(norm(e)); const ctx=cv.getContext("2d"),w=cv.width,h=cv.height; ctx.strokeStyle=pen.c;ctx.lineCap="round";ctx.lineWidth=Math.max(2,w*pen.w); const a=stroke[stroke.length-2],b=stroke[stroke.length-1]; ctx.beginPath();ctx.moveTo(a[0]*w,a[1]*h);ctx.lineTo(b[0]*w,b[1]*h);ctx.stroke(); });
   cv.addEventListener("pointerup",()=>{ if(!stroke)return; if(stroke.length>1){ const key=cv.dataset.key; const st={p:stroke,c:pen.c,w:pen.w}; const a=getAnn(key); a.strokes.push(st);a.order.push("s"); } stroke=null; });
 }
-$("btn-member-draw").onclick=()=>{ buildPenModal(); $("btn-pen-start").onclick=()=>{ localStorage.setItem("praise_pen",JSON.stringify(pen)); closeModal("modal-pen"); setMemberTool("draw"); }; showModal("modal-pen"); };
+$("btn-member-draw").onclick=()=>{ buildPenModal(); showModal("modal-pen"); };
 $("btn-member-undo").onclick=()=>{ const key=annKeyCurrent(); if(key&&undoKey(key))toast("되돌렸어요"); };
 $("btn-member-erase").onclick=()=>{ document.querySelectorAll(".pane canvas").forEach(cv=>{ const key=cv.dataset.key; state.ann[key]={strokes:[],badges:[],order:[],textboxes:[]}; drawAnn(cv); }); toast("지웠어요"); };
 $("btn-member-duo").onclick=()=>{ state.duo=!state.duo; $("btn-member-duo")?.classList.toggle("on",state.duo); render(); if(state.duo)toast("가로 화면에서 더 좋아요"); };
@@ -2299,18 +2301,27 @@ $("btn-timer-next").onclick=()=>{
 };
 
 /* ═══════════════════════════════════════════════════
-   악기 세팅 메모
+   곡별 악기 세팅 메모 (리더·팀원·반주자 모두)
 ═══════════════════════════════════════════════════ */
-function instrKey(){ return "praise_instr_"+(state.room?.id||""); }
-$("btn-instrument").onclick=()=>{
+function instrKey(){
+  const song=state.songs[state.songIdx];
+  const songId=song?song.id:"none";
+  return "praise_instr_"+(state.room?.id||"")+"_"+songId;
+}
+function openInstrument(){
+  const song=state.songs[state.songIdx];
+  if(!song){ toast("곡을 먼저 선택하세요"); return; }
+  $("instrument-song-label").textContent=`${state.songIdx+1}. ${song.title}`;
   $("instrument-text").value=localStorage.getItem(instrKey())||"";
   showModal("modal-instrument");
   setTimeout(()=>$("instrument-text").focus(),120);
-};
+}
+$("btn-instrument").onclick=openInstrument;
+$("btn-member-instrument").onclick=openInstrument;
 $("btn-instrument-save").onclick=()=>{
   localStorage.setItem(instrKey(),$("instrument-text").value);
   closeModal("modal-instrument");
-  toast("악기 세팅을 저장했어요");
+  toast("이 곡의 악기 세팅을 저장했어요");
 };
 $("btn-instrument-close").onclick=()=>{
   localStorage.setItem(instrKey(),$("instrument-text").value);
@@ -2414,7 +2425,7 @@ cloud.deleteRSchedule=async function(id){ await sb.from("praise_schedules").dele
 cloud.listRPrayers=async function(rid){ const {data}=await sb.from("praise_prayers").select().eq("room_id",rid).order("created_at",{ascending:false}); return data||[]; };
 cloud.addRPrayer=async function(p){ p.room_id=roomId(); if(!p.room_id){toast("방에 입장한 상태에서 추가해주세요");return null;} const {data,error}=await sb.from("praise_prayers").insert(p).select().single(); if(error){toast("저장 실패: "+error.message);return null;} return data; };
 cloud.toggleRPrayer=async function(id){ const {data}=await sb.from("praise_prayers").select("is_answered").eq("id",id).single(); if(data)await sb.from("praise_prayers").update({is_answered:!data.is_answered}).eq("id",id); };
-cloud.addPrayCount=async function(id){ await sb.from("praise_prayers").rpc("increment_pray_count",{row_id:id}).catch(async()=>{ const {data}=await sb.from("praise_prayers").select("pray_count").eq("id",id).single(); if(data)await sb.from("praise_prayers").update({pray_count:(data.pray_count||0)+1}).eq("id",id); }); };
+cloud.addPrayCount=async function(id){ try{ const {data}=await sb.from("praise_prayers").select("pray_count").eq("id",id).single(); if(data)await sb.from("praise_prayers").update({pray_count:(data.pray_count||0)+1}).eq("id",id); }catch(e){} };
 cloud.deleteRPrayer=async function(id){ await sb.from("praise_prayers").delete().eq("id",id); };
 cloud.listRNotices=async function(rid){ const {data}=await sb.from("praise_notices").select().eq("room_id",rid).order("is_pinned",{ascending:false}).order("created_at",{ascending:false}); return data||[]; };
 cloud.addRNotice=async function(n){ n.room_id=roomId(); if(!n.room_id){toast("방에 입장한 상태에서 추가해주세요");return null;} const {data,error}=await sb.from("praise_notices").insert(n).select().single(); if(error){toast("저장 실패: "+error.message);return null;} return data; };
