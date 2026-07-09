@@ -1057,9 +1057,9 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
 /* ═══════════════════════════════════════════════════
    ⚙️  설정 — 여기만 채우면 됩니다
 ═══════════════════════════════════════════════════ */
-const SUPABASE_URL = "https://dgjotupusjfunwatxatw.supabase.co";
+const SUPABASE_URL      = "https://dgjotupusjfunwatxatw.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRnam90dXB1c2pmdW53YXR4YXR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxNDUyMDcsImV4cCI6MjA5ODcyMTIwN30.gkIz1ZygkEyqADa_YFAlOZ5hAfvTSb5MeWM77ydNpko";
-const ADMIN_PIN = "4695";
+const ADMIN_PIN         = "4695";
 
 /* ═══════════════════════════════════════════════════
    기초
@@ -2419,7 +2419,7 @@ demo.getWeeklyPrayer=async function(rid){ try{ return JSON.parse(localStorage.ge
 demo.setWeeklyPrayer=async function(rid,text){ localStorage.setItem("praise_weekly_"+rid,JSON.stringify({text,updated_at:new Date().toISOString()})); };
 
 // 클라우드 모드
-cloud.listRSchedules=async function(rid){ const {data}=await sb.from("praise_schedules").select().eq("room_id",rid).order("date",{ascending:true}).order("start_time",{ascending:true,nullsFirst:false}); return data||[]; };
+cloud.listRSchedules=async function(rid){ const {data}=await sb.from("praise_schedules").select().eq("room_id",rid).order("date",{ascending:true}); return data||[]; };
 cloud.addRSchedule=async function(s){ s.room_id=roomId(); if(!s.room_id){toast("방에 입장한 상태에서 추가해주세요");return null;} const {data,error}=await sb.from("praise_schedules").insert(s).select().single(); if(error){toast("저장 실패: "+error.message);return null;} return data; };
 cloud.deleteRSchedule=async function(id){ await sb.from("praise_schedules").delete().eq("id",id); };
 cloud.listRPrayers=async function(rid){ const {data}=await sb.from("praise_prayers").select().eq("room_id",rid).order("created_at",{ascending:false}); return data||[]; };
