@@ -2419,7 +2419,7 @@ demo.getWeeklyPrayer=async function(rid){ try{ return JSON.parse(localStorage.ge
 demo.setWeeklyPrayer=async function(rid,text){ localStorage.setItem("praise_weekly_"+rid,JSON.stringify({text,updated_at:new Date().toISOString()})); };
 
 // 클라우드 모드
-cloud.listRSchedules=async function(rid){ const {data}=await sb.from("praise_schedules").select().eq("room_id",rid).order("date").order("start_time"); return data||[]; };
+cloud.listRSchedules=async function(rid){ const {data}=await sb.from("praise_schedules").select().eq("room_id",rid).order("date",{ascending:true}).order("start_time",{ascending:true,nullsFirst:false}); return data||[]; };
 cloud.addRSchedule=async function(s){ s.room_id=roomId(); if(!s.room_id){toast("방에 입장한 상태에서 추가해주세요");return null;} const {data,error}=await sb.from("praise_schedules").insert(s).select().single(); if(error){toast("저장 실패: "+error.message);return null;} return data; };
 cloud.deleteRSchedule=async function(id){ await sb.from("praise_schedules").delete().eq("id",id); };
 cloud.listRPrayers=async function(rid){ const {data}=await sb.from("praise_prayers").select().eq("room_id",rid).order("created_at",{ascending:false}); return data||[]; };
@@ -2427,7 +2427,7 @@ cloud.addRPrayer=async function(p){ p.room_id=roomId(); if(!p.room_id){toast("�
 cloud.toggleRPrayer=async function(id){ const {data}=await sb.from("praise_prayers").select("is_answered").eq("id",id).single(); if(data)await sb.from("praise_prayers").update({is_answered:!data.is_answered}).eq("id",id); };
 cloud.addPrayCount=async function(id){ try{ const {data}=await sb.from("praise_prayers").select("pray_count").eq("id",id).single(); if(data)await sb.from("praise_prayers").update({pray_count:(data.pray_count||0)+1}).eq("id",id); }catch(e){} };
 cloud.deleteRPrayer=async function(id){ await sb.from("praise_prayers").delete().eq("id",id); };
-cloud.listRNotices=async function(rid){ const {data}=await sb.from("praise_notices").select().eq("room_id",rid).order("is_pinned",{ascending:false}).order("created_at",{ascending:false}); return data||[]; };
+cloud.listRNotices=async function(rid){ const {data}=await sb.from("praise_notices").select().eq("room_id",rid).order("created_at",{ascending:false}); return data||[]; };
 cloud.addRNotice=async function(n){ n.room_id=roomId(); if(!n.room_id){toast("방에 입장한 상태에서 추가해주세요");return null;} const {data,error}=await sb.from("praise_notices").insert(n).select().single(); if(error){toast("저장 실패: "+error.message);return null;} return data; };
 cloud.deleteRNotice=async function(id){ await sb.from("praise_notices").delete().eq("id",id); };
 cloud.getWeeklyPrayer=async function(rid){ try{ const {data}=await sb.from("praise_settings").select("data").eq("id","weekly_"+rid).maybeSingle(); return data?.data||null; }catch(e){return null;} };
@@ -2473,7 +2473,7 @@ function onCalDayClick(date){
 }
 
 async function loadRSchedules(){
-  if(!state.room) return;
+  if(!state.room||!roomId()) return;
   renderRCal();
   const list=await api.listRSchedules(roomId());
   // 달력 점 표시
@@ -2549,7 +2549,7 @@ $("btn-edit-weekly").onclick=()=>{
 };
 
 async function loadRPrayers(){
-  if(!state.room) return;
+  if(!state.room||!roomId()) return;
   const all=await api.listRPrayers(roomId());
   const list=prayFilter==="all"?all:prayFilter==="answered"?all.filter(p=>p.is_answered):all.filter(p=>!p.is_answered);
   const box=$("rprayer-list");
@@ -2604,7 +2604,7 @@ $("btn-prayer-save").onclick=async()=>{
    공지사항 (방 안, 리더만 작성)
 ═══════════════════════════════════════════════════ */
 async function loadRNotices(){
-  if(!state.room) return;
+  if(!state.room||!roomId()) return;
   const list=await api.listRNotices(roomId());
   const box=$("rnotice-list");
   if(!list.length){ box.innerHTML=`<div style="color:var(--muted);text-align:center;padding:40px;font-size:14px">공지사항이 없어요</div>`; return; }
