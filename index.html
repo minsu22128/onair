@@ -755,7 +755,8 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
       <button class="tool-btn" id="btn-instrument">🎸 이 곡 악기</button>
       <button class="tool-btn" id="btn-zoom-in">🔍＋</button>
       <button class="tool-btn" id="btn-zoom-out">🔍－</button>
-      <button class="tool-btn" id="btn-zoom-reset">1:1</button>
+      <button class="tool-btn" id="btn-zoom-reset">100%</button>
+      <button class="tool-btn" id="btn-rotate">⟳ 가로</button>
       <button class="tool-btn" id="btn-fullscreen">⛶ 전체화면</button>
     </div>
     <!-- 팀원·반주자 도구 -->
@@ -2342,6 +2343,10 @@ function applyZoom(){
   $("btn-zoom-reset").textContent = Math.round(zoomLevel*100)+"%";
   $("btn-zoom-reset").classList.toggle("on", zoomLevel !== 1.0);
 
+  // 확대 상태면 grab 커서
+  const wrap2 = $("stage-wrap");
+  if(wrap2) wrap2.style.cursor = zoomLevel > 1.0 ? "grab" : "";
+
   // 캔버스 재계산
   requestAnimationFrame(()=>{
     document.querySelectorAll(".pane").forEach(pane=>{
@@ -2446,6 +2451,7 @@ $("btn-fullscreen").onclick = ()=>{
 const _origBtnBack = $("btn-back").onclick;
 $("btn-back").onclick = ()=>{
   if(sheetFullscreen) exitSheetFullscreen();
+  if(isRotated){ isRotated=false; const r=$("screen-room"); r.style.transform=""; r.style.width=""; r.style.height=""; r.style.position="fixed"; r.style.top=""; r.style.left=""; $("btn-rotate").textContent="⟳ 가로"; $("btn-rotate").classList.remove("on"); }
   zoomLevel = 1.0;
   if(_origBtnBack) _origBtnBack();
 };
@@ -2462,6 +2468,63 @@ document.addEventListener("keydown", e=>{
 });
 
 
+
+/* ── 마우스 드래그 스크롤 (확대 상태에서) ── */
+(function(){
+  let dragging=false, startX=0, startY=0, scrollX=0, scrollY=0;
+  const getWrap=()=>$("stage-wrap");
+  document.addEventListener("mousedown", e=>{
+    const wrap=getWrap();
+    if(!wrap||zoomLevel<=1.0) return;
+    if(e.target.closest(".tool-btn,.modal-veil,.drawer,.room-topbar,#room-tab-bar")) return;
+    if(state.tool) return; // 그리기 도구 사용 중엔 드래그 안 함
+    dragging=true;
+    startX=e.clientX; startY=e.clientY;
+    scrollX=wrap.scrollLeft; scrollY=wrap.scrollTop;
+    wrap.style.cursor="grabbing";
+    e.preventDefault();
+  });
+  document.addEventListener("mousemove", e=>{
+    if(!dragging) return;
+    const wrap=getWrap(); if(!wrap) return;
+    wrap.scrollLeft = scrollX-(e.clientX-startX);
+    wrap.scrollTop  = scrollY-(e.clientY-startY);
+  });
+  document.addEventListener("mouseup", ()=>{
+    if(!dragging) return;
+    dragging=false;
+    const wrap=getWrap();
+    if(wrap) wrap.style.cursor = zoomLevel>1.0?"grab":"";
+  });
+})();
+
+/* ── 가로/세로 전환 ── */
+let isRotated = false;
+$("btn-rotate").onclick = ()=>{
+  isRotated = !isRotated;
+  const room = $("screen-room");
+  if(isRotated){
+    // 가로 강제
+    room.style.cssText += ";transform:rotate(90deg);transform-origin:center center;width:100dvh;height:100dvw;position:fixed;top:50%;left:50%;translate:-50% -50%;z-index:150;";
+    $("btn-rotate").textContent = "⟳ 세로";
+    $("btn-rotate").classList.add("on");
+    toast("가로 모드 — 다시 누르면 세로로 돌아옵니다");
+  } else {
+    room.style.cssText = room.style.cssText
+      .replace(/transform[^;]*;?/g,"")
+      .replace(/width:100dvh[^;]*;?/g,"")
+      .replace(/height:100dvw[^;]*;?/g,"")
+      .replace(/top:50%[^;]*;?/g,"")
+      .replace(/left:50%[^;]*;?/g,"")
+      .replace(/translate[^;]*;?/g,"")
+      .replace(/z-index:150[^;]*;?/g,"");
+    room.style.transform=""; room.style.width=""; room.style.height="";
+    room.style.position="fixed"; room.style.top=""; room.style.left=""; room.style.translate="";
+    $("btn-rotate").textContent = "⟳ 가로";
+    $("btn-rotate").classList.remove("on");
+    toast("세로 모드로 돌아왔어요");
+  }
+};
 
 function instrKey(){
   const song=state.songs[state.songIdx];
