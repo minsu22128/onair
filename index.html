@@ -2321,31 +2321,34 @@ function applyZoom(){
   if(!wrap || !stage) return;
 
   if(zoomLevel <= 1.0){
-    // 기본: 화면에 꽉 맞게
+    // 기본: 화면에 꽉 맞게 (object-fit:contain 방식)
     wrap.style.overflow  = "hidden";
+    wrap.style.alignItems = "";
     stage.style.overflow = "hidden";
+    stage.style.alignItems = "stretch";
+    stage.style.minWidth = "";
     stage.querySelectorAll("img").forEach(img=>{
       img.style.cssText = "";
     });
   } else {
-    // 확대: 스크롤 가능하게
-    wrap.style.overflow  = "auto";
-    stage.style.overflow = "visible";
-    stage.style.minWidth = "100%";
+    // 확대: wrap을 scroll 가능하게, 악보는 높이 기준으로 키움
+    wrap.style.overflow   = "auto";
+    wrap.style.alignItems = "flex-start"; // 위에서부터 시작 (잘림 방지)
+    stage.style.overflow  = "visible";
+    stage.style.alignItems = "flex-start";
+    stage.style.minWidth  = "max-content";
+    const h = Math.round(zoomLevel * (wrap.clientHeight || window.innerHeight * 0.7));
     stage.querySelectorAll("img").forEach(img=>{
       img.style.maxWidth  = "none";
       img.style.maxHeight = "none";
       img.style.width     = "auto";
-      img.style.height    = Math.round(zoomLevel * window.innerHeight * 0.92) + "px";
+      img.style.height    = h + "px";
     });
   }
 
   $("btn-zoom-reset").textContent = Math.round(zoomLevel*100)+"%";
   $("btn-zoom-reset").classList.toggle("on", zoomLevel !== 1.0);
-
-  // 확대 상태면 grab 커서
-  const wrap2 = $("stage-wrap");
-  if(wrap2) wrap2.style.cursor = zoomLevel > 1.0 ? "grab" : "";
+  wrap.style.cursor = zoomLevel > 1.0 ? "grab" : "";
 
   // 캔버스 재계산
   requestAnimationFrame(()=>{
@@ -2451,7 +2454,7 @@ $("btn-fullscreen").onclick = ()=>{
 const _origBtnBack = $("btn-back").onclick;
 $("btn-back").onclick = ()=>{
   if(sheetFullscreen) exitSheetFullscreen();
-  if(isRotated){ isRotated=false; const r=$("screen-room"); r.style.transform=""; r.style.width=""; r.style.height=""; r.style.position="fixed"; r.style.top=""; r.style.left=""; $("btn-rotate").textContent="⟳ 가로"; $("btn-rotate").classList.remove("on"); }
+  if(isRotated){ $("btn-rotate").click(); } // 가로 보기 해제
   zoomLevel = 1.0;
   if(_origBtnBack) _origBtnBack();
 };
@@ -2498,31 +2501,45 @@ document.addEventListener("keydown", e=>{
   });
 })();
 
-/* ── 가로/세로 전환 ── */
+/* ── 악보 가로 보기 (악보 이미지 90도 회전) ── */
 let isRotated = false;
 $("btn-rotate").onclick = ()=>{
   isRotated = !isRotated;
-  const room = $("screen-room");
+  const stage = $("stage");
+  if(!stage) return;
+
   if(isRotated){
-    // 가로 강제
-    room.style.cssText += ";transform:rotate(90deg);transform-origin:center center;width:100dvh;height:100dvw;position:fixed;top:50%;left:50%;translate:-50% -50%;z-index:150;";
+    // 악보 이미지를 90도 회전해서 가로로 크게 보기
+    stage.querySelectorAll(".pane img").forEach(img=>{
+      img.style.transformOrigin = "center center";
+      img.style.transform = "rotate(90deg)";
+      // 회전 후 크기: 높이↔너비 교환
+      img.style.maxWidth  = "none";
+      img.style.maxHeight = "none";
+      img.style.width     = (stage.clientHeight * 0.95) + "px";
+      img.style.height    = "auto";
+    });
+    // stage-wrap 스크롤 가능하게
+    const wrap = $("stage-wrap");
+    if(wrap){ wrap.style.overflow="auto"; wrap.style.cursor="grab"; }
     $("btn-rotate").textContent = "⟳ 세로";
     $("btn-rotate").classList.add("on");
-    toast("가로 모드 — 다시 누르면 세로로 돌아옵니다");
+    toast("악보 가로 보기 — 드래그로 이동 가능");
   } else {
-    room.style.cssText = room.style.cssText
-      .replace(/transform[^;]*;?/g,"")
-      .replace(/width:100dvh[^;]*;?/g,"")
-      .replace(/height:100dvw[^;]*;?/g,"")
-      .replace(/top:50%[^;]*;?/g,"")
-      .replace(/left:50%[^;]*;?/g,"")
-      .replace(/translate[^;]*;?/g,"")
-      .replace(/z-index:150[^;]*;?/g,"");
-    room.style.transform=""; room.style.width=""; room.style.height="";
-    room.style.position="fixed"; room.style.top=""; room.style.left=""; room.style.translate="";
+    // 원래대로
+    stage.querySelectorAll(".pane img").forEach(img=>{
+      img.style.transform = "";
+      img.style.transformOrigin = "";
+      img.style.width = "";
+      img.style.height = "";
+      img.style.maxWidth = "";
+      img.style.maxHeight = "";
+    });
+    const wrap = $("stage-wrap");
+    if(wrap){ wrap.style.overflow="hidden"; wrap.style.cursor=""; }
     $("btn-rotate").textContent = "⟳ 가로";
     $("btn-rotate").classList.remove("on");
-    toast("세로 모드로 돌아왔어요");
+    toast("세로 보기로 돌아왔어요");
   }
 };
 
