@@ -753,6 +753,10 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
       <button class="tool-btn" id="btn-note">📝 멘트</button>
       <button class="tool-btn" id="btn-timer">⏱ 타이머</button>
       <button class="tool-btn" id="btn-instrument">🎸 이 곡 악기</button>
+      <button class="tool-btn" id="btn-zoom-in">🔍＋</button>
+      <button class="tool-btn" id="btn-zoom-out">🔍－</button>
+      <button class="tool-btn" id="btn-zoom-reset">1:1</button>
+      <button class="tool-btn" id="btn-fullscreen">⛶ 전체화면</button>
     </div>
     <!-- 팀원·반주자 도구 -->
     <div class="tool-row hidden" id="member-tool-row">
@@ -2301,8 +2305,109 @@ $("btn-timer-next").onclick=()=>{
 };
 
 /* ═══════════════════════════════════════════════════
-   곡별 악기 세팅 메모 (리더·팀원·반주자 모두)
+   악보 확대 / 축소 / 전체화면 (리더)
 ═══════════════════════════════════════════════════ */
+let zoomLevel = 1.0;
+const ZOOM_STEP = 0.15;
+const ZOOM_MIN  = 0.5;
+const ZOOM_MAX  = 3.0;
+
+function applyZoom(){
+  const stage = $("stage");
+  if(!stage) return;
+  if(zoomLevel === 1.0){
+    stage.style.overflow = "hidden";
+    stage.querySelectorAll("img").forEach(img=>{
+      img.style.width = ""; img.style.height = ""; img.style.maxWidth = ""; img.style.maxHeight = "";
+    });
+  } else {
+    stage.style.overflow = "auto";
+    stage.querySelectorAll("img").forEach(img=>{
+      img.style.maxWidth  = "none";
+      img.style.maxHeight = "none";
+      img.style.width     = "auto";
+      img.style.height    = (zoomLevel * 100) + "dvh";
+    });
+  }
+  $("btn-zoom-reset").textContent = Math.round(zoomLevel*100)+"%";
+  $("btn-zoom-reset").classList.toggle("on", zoomLevel !== 1.0);
+  // 캔버스 재계산
+  document.querySelectorAll(".pane").forEach(pane=>{
+    const img = pane.querySelector("img");
+    const cv  = pane.querySelector("canvas");
+    if(img && cv && img.complete && img.naturalWidth) fitCv(cv, img);
+  });
+}
+
+$("btn-zoom-in").onclick = ()=>{
+  zoomLevel = Math.min(ZOOM_MAX, +(zoomLevel + ZOOM_STEP).toFixed(2));
+  applyZoom();
+};
+$("btn-zoom-out").onclick = ()=>{
+  zoomLevel = Math.max(ZOOM_MIN, +(zoomLevel - ZOOM_STEP).toFixed(2));
+  applyZoom();
+};
+$("btn-zoom-reset").onclick = ()=>{
+  zoomLevel = 1.0;
+  applyZoom();
+  toast("원래 크기로 돌아왔어요");
+};
+
+// 핀치 줌 (터치)
+(function(){
+  let initDist = null, initZoom = 1.0;
+  document.addEventListener("touchstart", e=>{
+    if(e.touches.length===2 && state.room){
+      initDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+      initZoom = zoomLevel;
+    }
+  }, {passive:true});
+  document.addEventListener("touchmove", e=>{
+    if(e.touches.length===2 && initDist && state.room){
+      const dist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+      zoomLevel = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, +(initZoom * dist / initDist).toFixed(2)));
+      applyZoom();
+    }
+  }, {passive:true});
+  document.addEventListener("touchend", ()=>{ initDist=null; }, {passive:true});
+})();
+
+// 전체화면
+$("btn-fullscreen").onclick = ()=>{
+  const el = $("screen-room");
+  if(!document.fullscreenElement){
+    (el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen).call(el)
+      .then(()=>{ $("btn-fullscreen").textContent="✕ 전체화면 끄기"; $("btn-fullscreen").classList.add("on"); })
+      .catch(()=>toast("전체화면을 지원하지 않는 환경이에요"));
+  } else {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    $("btn-fullscreen").textContent="⛶ 전체화면"; $("btn-fullscreen").classList.remove("on");
+  }
+};
+document.addEventListener("fullscreenchange", ()=>{
+  if(!document.fullscreenElement){
+    $("btn-fullscreen").textContent="⛶ 전체화면"; $("btn-fullscreen").classList.remove("on");
+  }
+});
+
+// 방 나갈 때 줌 초기화
+const _origBtnBack = $("btn-back").onclick;
+$("btn-back").onclick = ()=>{
+  zoomLevel = 1.0;
+  if(_origBtnBack) _origBtnBack();
+};
+
+// 키보드 단축키 (+ / -)
+document.addEventListener("keydown", e=>{
+  if(!state.room || e.target?.tagName==="INPUT" || e.target?.tagName==="TEXTAREA") return;
+  if(document.querySelector(".modal-veil.show")) return;
+  if(e.key==="+" || e.key==="="){ e.preventDefault(); zoomLevel=Math.min(ZOOM_MAX,+(zoomLevel+ZOOM_STEP).toFixed(2)); applyZoom(); }
+  if(e.key==="-"){               e.preventDefault(); zoomLevel=Math.max(ZOOM_MIN,+(zoomLevel-ZOOM_STEP).toFixed(2)); applyZoom(); }
+  if(e.key==="0"){               e.preventDefault(); zoomLevel=1.0; applyZoom(); }
+  if(e.key==="F11"||e.key==="f"){ e.preventDefault(); $("btn-fullscreen").click(); }
+});
+
+
 function instrKey(){
   const song=state.songs[state.songIdx];
   const songId=song?song.id:"none";
