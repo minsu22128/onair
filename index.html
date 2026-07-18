@@ -423,6 +423,25 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
 .cal-day.selected .dn{background:rgba(232,176,75,.25);border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center}
 /* 예배 타이머 */
 .timer-display{font-size:52px;font-weight:900;text-align:center;font-variant-numeric:tabular-nums;color:var(--accent);letter-spacing:-.02em;padding:16px 0}
+
+/* 전체화면 미니툴바 */
+#fs-toolbar{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  z-index:201;display:none;
+  background:rgba(12,14,20,.92);border:1px solid rgba(255,255,255,.18);
+  border-radius:99px;padding:8px 18px;gap:4px;align-items:center;
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  box-shadow:0 8px 32px rgba(0,0,0,.6);
+}
+#fs-toolbar.show{display:flex}
+#fs-toolbar button{
+  background:none;border:none;color:#d0cfe8;font-size:15px;font-weight:700;
+  padding:8px 12px;border-radius:12px;cursor:pointer;white-space:nowrap;
+  transition:background .12s,color .12s;
+}
+#fs-toolbar button:active{background:rgba(255,255,255,.15)}
+#fs-toolbar button.on{color:#e8b04b}
+#fs-toolbar .fs-sep{width:1px;height:22px;background:rgba(255,255,255,.15);margin:0 4px;flex:none}
 .timer-section{background:var(--surface2);border-radius:var(--r-sm);padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;cursor:pointer}
 .timer-section.active{background:rgba(232,176,75,.12);border:1.5px solid rgba(232,176,75,.35)}
 .timer-section .ts-icon{font-size:22px;flex:none}
@@ -1041,6 +1060,22 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
     <button class="btn primary" id="btn-notice-save">등록하기</button>
     <button class="btn ghost" id="btn-notice-cancel">취소</button>
   </div>
+</div>
+
+<!-- 전체화면 미니툴바 -->
+<div id="fs-toolbar">
+  <button id="fs-prev">◀</button>
+  <button id="fs-next">▶</button>
+  <div class="fs-sep"></div>
+  <button id="fs-zoom-in">＋</button>
+  <button id="fs-zoom-out">－</button>
+  <button id="fs-zoom-reset">100%</button>
+  <div class="fs-sep"></div>
+  <button id="fs-rotate-cw">↻</button>
+  <button id="fs-rotate-ccw">↺</button>
+  <button id="fs-rotate-reset">↑</button>
+  <div class="fs-sep"></div>
+  <button id="fs-exit">✕ 나가기</button>
 </div>
 
 <!-- 앱 설치 안내 -->
@@ -2306,242 +2341,171 @@ $("btn-timer-next").onclick=()=>{
 };
 
 /* ═══════════════════════════════════════════════════
-   악보 확대 / 축소 / 전체화면
+/* ═══════════════════════════════════════════════════
+   확대·축소·전체화면·방향전환 (통합)
 ═══════════════════════════════════════════════════ */
 let zoomLevel = 1.0;
-const ZOOM_STEP = 0.2;
-const ZOOM_MIN  = 0.5;
-const ZOOM_MAX  = 4.0;
+const ZOOM_STEP = 0.2, ZOOM_MIN = 0.5, ZOOM_MAX = 4.0;
 let sheetFullscreen = false;
+let rotateDeg = 0; // 0 | 90 | -90 | 180
 
 /* ── 확대 적용 ── */
 function applyZoom(){
-  const wrap = $("stage-wrap");
-  const stage = $("stage");
-  if(!wrap || !stage) return;
-
+  const wrap = $("stage-wrap"), stage = $("stage");
+  if(!wrap||!stage) return;
   if(zoomLevel <= 1.0){
-    // 기본: 화면에 꽉 맞게 (object-fit:contain 방식)
-    wrap.style.overflow  = "hidden";
-    wrap.style.alignItems = "";
-    stage.style.overflow = "hidden";
-    stage.style.alignItems = "stretch";
-    stage.style.minWidth = "";
-    stage.querySelectorAll("img").forEach(img=>{
-      img.style.cssText = "";
-    });
+    wrap.style.overflow = "hidden"; wrap.style.alignItems = "";
+    stage.style.overflow = "hidden"; stage.style.alignItems = "stretch"; stage.style.minWidth = "";
+    stage.querySelectorAll("img").forEach(img=>img.style.cssText="");
   } else {
-    // 확대: wrap을 scroll 가능하게, 악보는 높이 기준으로 키움
-    wrap.style.overflow   = "auto";
-    wrap.style.alignItems = "flex-start"; // 위에서부터 시작 (잘림 방지)
-    stage.style.overflow  = "visible";
-    stage.style.alignItems = "flex-start";
-    stage.style.minWidth  = "max-content";
-    const h = Math.round(zoomLevel * (wrap.clientHeight || window.innerHeight * 0.7));
+    wrap.style.overflow = "auto"; wrap.style.alignItems = "flex-start";
+    stage.style.overflow = "visible"; stage.style.alignItems = "flex-start"; stage.style.minWidth = "max-content";
+    const h = Math.round(zoomLevel * (wrap.clientHeight || window.innerHeight*0.7));
     stage.querySelectorAll("img").forEach(img=>{
-      img.style.maxWidth  = "none";
-      img.style.maxHeight = "none";
-      img.style.width     = "auto";
-      img.style.height    = h + "px";
+      img.style.maxWidth="none"; img.style.maxHeight="none"; img.style.width="auto"; img.style.height=h+"px";
     });
   }
-
-  $("btn-zoom-reset").textContent = Math.round(zoomLevel*100)+"%";
-  $("btn-zoom-reset").classList.toggle("on", zoomLevel !== 1.0);
-  wrap.style.cursor = zoomLevel > 1.0 ? "grab" : "";
-
-  // 캔버스 재계산
+  const pct = Math.round(zoomLevel*100)+"%";
+  [$("btn-zoom-reset"), $("fs-zoom-reset")].forEach(b=>{ if(b) b.textContent=pct; });
+  [$("btn-zoom-reset"), $("fs-zoom-reset")].forEach(b=>{ if(b) b.classList.toggle("on", zoomLevel!==1.0); });
+  wrap.style.cursor = zoomLevel>1.0 ? "grab" : "";
   requestAnimationFrame(()=>{
     document.querySelectorAll(".pane").forEach(pane=>{
-      const img = pane.querySelector("img");
-      const cv  = pane.querySelector("canvas");
-      if(img && cv && img.complete && img.naturalWidth) fitCv(cv, img);
+      const img=pane.querySelector("img"), cv=pane.querySelector("canvas");
+      if(img&&cv&&img.complete&&img.naturalWidth) fitCv(cv,img);
     });
   });
 }
 
-$("btn-zoom-in").onclick = ()=>{
-  zoomLevel = Math.min(ZOOM_MAX, +(zoomLevel + ZOOM_STEP).toFixed(1));
-  applyZoom();
-};
-$("btn-zoom-out").onclick = ()=>{
-  zoomLevel = Math.max(ZOOM_MIN, +(zoomLevel - ZOOM_STEP).toFixed(1));
-  applyZoom();
-};
-$("btn-zoom-reset").onclick = ()=>{
-  zoomLevel = 1.0;
-  applyZoom();
-  toast("원래 크기");
-};
-
-/* ── 핀치 줌 (터치) ── */
-(function(){
-  let initDist=null, initZoom=1.0;
-  document.addEventListener("touchstart", e=>{
-    if(e.touches.length===2 && state.room){
-      initDist = Math.hypot(
-        e.touches[0].clientX-e.touches[1].clientX,
-        e.touches[0].clientY-e.touches[1].clientY
-      );
-      initZoom = zoomLevel;
-    }
-  },{passive:true});
-  document.addEventListener("touchmove", e=>{
-    if(e.touches.length!==2||!initDist||!state.room) return;
-    const dist=Math.hypot(
-      e.touches[0].clientX-e.touches[1].clientX,
-      e.touches[0].clientY-e.touches[1].clientY
-    );
-    zoomLevel = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, +(initZoom*dist/initDist).toFixed(2)));
+/* ── 방향 전환 ── */
+function applyRotation(){
+  const stage = $("stage"); if(!stage) return;
+  const wrap  = $("stage-wrap"); if(!wrap) return;
+  // stage 전체를 회전 (이미지만 아니라 전체 stage)
+  stage.style.transform       = rotateDeg ? `rotate(${rotateDeg}deg)` : "";
+  stage.style.transformOrigin = "center center";
+  if(rotateDeg===90 || rotateDeg===-90){
+    // 가로 회전 시 너비/높이 교환
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    stage.style.width  = h+"px";
+    stage.style.height = w+"px";
+    stage.style.position = "absolute";
+    stage.style.top  = ((h-w)/2)+"px";
+    stage.style.left = ((w-h)/2)+"px";
+    wrap.style.overflow = "hidden";
+  } else if(rotateDeg===180){
+    stage.style.width=""; stage.style.height=""; stage.style.position=""; stage.style.top=""; stage.style.left="";
+    wrap.style.overflow = "hidden";
+  } else {
+    stage.style.width=""; stage.style.height=""; stage.style.position=""; stage.style.top=""; stage.style.left="";
     applyZoom();
-  },{passive:true});
-  document.addEventListener("touchend", ()=>{ initDist=null; },{passive:true});
-})();
+  }
+  // 미니툴바 버튼 상태
+  const rd = $("fs-rotate-reset"); if(rd) rd.classList.toggle("on", rotateDeg!==0);
+}
 
-/* ── 악보 전용 전체화면 ── */
+/* ── 전체화면 ── */
 function enterSheetFullscreen(){
   sheetFullscreen = true;
-  $("btn-fullscreen").textContent = "✕ 나가기";
-  $("btn-fullscreen").classList.add("on");
-  // 상단바·탭바·도구바 전부 숨기기
-  ["room-topbar","room-tab-bar","room-bottom"].forEach(id=>{
-    const el=$(id); if(el) el.style.display="none";
-  });
-  // stage-wrap 전체 화면 차지
+  $("btn-fullscreen").textContent="✕ 나가기"; $("btn-fullscreen").classList.add("on");
+  ["room-topbar","room-tab-bar","room-bottom"].forEach(id=>{ const el=$(id); if(el) el.style.display="none"; });
   const wrap=$("stage-wrap");
-  wrap.style.position = "fixed";
-  wrap.style.inset    = "0";
-  wrap.style.zIndex   = "100";
-  wrap.style.background = "#000";
-  // 전체화면 나가기 버튼 따로 띄우기
-  let exitBtn = document.getElementById("fs-exit-btn");
-  if(!exitBtn){
-    exitBtn = document.createElement("button");
-    exitBtn.id = "fs-exit-btn";
-    exitBtn.textContent = "✕";
-    exitBtn.style.cssText = "position:fixed;top:12px;right:12px;z-index:200;background:rgba(0,0,0,.55);color:#fff;border:1.5px solid rgba(255,255,255,.3);border-radius:99px;padding:8px 16px;font-size:16px;font-weight:700;cursor:pointer";
-    exitBtn.onclick = exitSheetFullscreen;
-    document.body.appendChild(exitBtn);
-  }
-  exitBtn.style.display = "block";
+  wrap.style.position="fixed"; wrap.style.inset="0"; wrap.style.zIndex="100"; wrap.style.background="#000";
+  $("fs-toolbar").classList.add("show");
+  updateFsZoom();
   applyZoom();
 }
-
 function exitSheetFullscreen(){
   sheetFullscreen = false;
-  $("btn-fullscreen").textContent = "⛶ 전체화면";
-  $("btn-fullscreen").classList.remove("on");
-  ["room-topbar","room-tab-bar","room-bottom"].forEach(id=>{
-    const el=$(id); if(el) el.style.display="";
-  });
+  $("btn-fullscreen").textContent="⛶ 전체화면"; $("btn-fullscreen").classList.remove("on");
+  ["room-topbar","room-tab-bar","room-bottom"].forEach(id=>{ const el=$(id); if(el) el.style.display=""; });
   const wrap=$("stage-wrap");
-  wrap.style.position = "";
-  wrap.style.inset    = "";
-  wrap.style.zIndex   = "";
-  wrap.style.background = "";
-  const exitBtn = document.getElementById("fs-exit-btn");
-  if(exitBtn) exitBtn.style.display = "none";
-  zoomLevel = 1.0;
-  applyZoom();
+  wrap.style.position=""; wrap.style.inset=""; wrap.style.zIndex=""; wrap.style.background="";
+  $("fs-toolbar").classList.remove("show");
+  rotateDeg=0; applyRotation();
+  zoomLevel=1.0; applyZoom();
+}
+function updateFsZoom(){
+  const pct=Math.round(zoomLevel*100)+"%";
+  const b=$("fs-zoom-reset"); if(b) b.textContent=pct;
 }
 
-$("btn-fullscreen").onclick = ()=>{
-  if(sheetFullscreen) exitSheetFullscreen();
-  else enterSheetFullscreen();
+$("btn-fullscreen").onclick = ()=>{ if(sheetFullscreen) exitSheetFullscreen(); else enterSheetFullscreen(); };
+
+/* ── 미니툴바 버튼 ── */
+$("fs-exit").onclick = exitSheetFullscreen;
+$("fs-prev").onclick = ()=>flip(-1);
+$("fs-next").onclick = ()=>flip(1);
+$("fs-zoom-in").onclick  = ()=>{ zoomLevel=Math.min(ZOOM_MAX,+(zoomLevel+ZOOM_STEP).toFixed(1)); applyZoom(); };
+$("fs-zoom-out").onclick = ()=>{ zoomLevel=Math.max(ZOOM_MIN,+(zoomLevel-ZOOM_STEP).toFixed(1)); applyZoom(); };
+$("fs-zoom-reset").onclick = ()=>{ zoomLevel=1.0; applyZoom(); };
+$("fs-rotate-cw").onclick    = ()=>{ rotateDeg=(rotateDeg+90)%360; if(rotateDeg===270)rotateDeg=-90; applyRotation(); toast(rotateDeg+"° 회전"); };
+$("fs-rotate-ccw").onclick   = ()=>{ rotateDeg=(rotateDeg-90); if(rotateDeg<-180)rotateDeg=180; applyRotation(); toast(rotateDeg+"° 회전"); };
+$("fs-rotate-reset").onclick = ()=>{ rotateDeg=0; applyRotation(); toast("방향 초기화"); };
+
+/* ── 일반 도구 줌 버튼 ── */
+$("btn-zoom-in").onclick   = ()=>{ zoomLevel=Math.min(ZOOM_MAX,+(zoomLevel+ZOOM_STEP).toFixed(1)); applyZoom(); };
+$("btn-zoom-out").onclick  = ()=>{ zoomLevel=Math.max(ZOOM_MIN,+(zoomLevel-ZOOM_STEP).toFixed(1)); applyZoom(); };
+$("btn-zoom-reset").onclick= ()=>{ zoomLevel=1.0; applyZoom(); toast("원래 크기"); };
+
+/* ── 일반 방향 버튼 (⟳ 가로) ── */
+$("btn-rotate").onclick = ()=>{
+  rotateDeg = rotateDeg===0 ? 90 : (rotateDeg===90 ? -90 : (rotateDeg===-90 ? 180 : 0));
+  applyRotation();
+  const labels={0:"⟳ 가로",90:"↻ 반시계","-90":"↺ 뒤집기",180:"↑ 원래대로"};
+  $("btn-rotate").textContent = labels[rotateDeg]||"⟳ 가로";
+  $("btn-rotate").classList.toggle("on", rotateDeg!==0);
 };
 
-// 방 나갈 때 초기화
+/* ── 핀치 줌 ── */
+(function(){
+  let initDist=null, initZoom=1.0;
+  document.addEventListener("touchstart",e=>{ if(e.touches.length===2&&state.room){ initDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); initZoom=zoomLevel; } },{passive:true});
+  document.addEventListener("touchmove",e=>{ if(e.touches.length!==2||!initDist||!state.room)return; const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); zoomLevel=Math.min(ZOOM_MAX,Math.max(ZOOM_MIN,+(initZoom*d/initDist).toFixed(2))); applyZoom(); },{passive:true});
+  document.addEventListener("touchend",()=>{initDist=null;},{passive:true});
+})();
+
+/* ── 마우스 드래그 스크롤 ── */
+(function(){
+  let dragging=false,startX=0,startY=0,scrollX=0,scrollY=0;
+  const getWrap=()=>$("stage-wrap");
+  document.addEventListener("mousedown",e=>{
+    const wrap=getWrap();
+    if(!wrap) return;
+    const canDrag = zoomLevel>1.0 || rotateDeg!==0;
+    if(!canDrag) return;
+    if(e.target.closest(".tool-btn,.modal-veil,.drawer,.room-topbar,#room-tab-bar,#fs-toolbar")) return;
+    if(state.tool) return;
+    dragging=true; startX=e.clientX; startY=e.clientY; scrollX=wrap.scrollLeft; scrollY=wrap.scrollTop;
+    wrap.style.cursor="grabbing"; e.preventDefault();
+  });
+  document.addEventListener("mousemove",e=>{ if(!dragging)return; const wrap=getWrap(); if(!wrap)return; wrap.scrollLeft=scrollX-(e.clientX-startX); wrap.scrollTop=scrollY-(e.clientY-startY); });
+  document.addEventListener("mouseup",()=>{ if(!dragging)return; dragging=false; const wrap=getWrap(); if(wrap)wrap.style.cursor=(zoomLevel>1.0||rotateDeg!==0)?"grab":""; });
+})();
+
+/* ── 방 나갈 때 초기화 ── */
 const _origBtnBack = $("btn-back").onclick;
 $("btn-back").onclick = ()=>{
   if(sheetFullscreen) exitSheetFullscreen();
-  if(isRotated){ $("btn-rotate").click(); } // 가로 보기 해제
-  zoomLevel = 1.0;
+  rotateDeg=0; applyRotation();
+  zoomLevel=1.0; applyZoom();
+  $("btn-rotate").textContent="⟳ 가로"; $("btn-rotate").classList.remove("on");
   if(_origBtnBack) _origBtnBack();
 };
 
-// 키보드 단축키
-document.addEventListener("keydown", e=>{
-  if(!state.room || e.target?.tagName==="INPUT" || e.target?.tagName==="TEXTAREA") return;
+/* ── 키보드 단축키 ── */
+document.addEventListener("keydown",e=>{
+  if(!state.room||e.target?.tagName==="INPUT"||e.target?.tagName==="TEXTAREA") return;
   if(document.querySelector(".modal-veil.show")) return;
   if(e.key==="+"||e.key==="="){ e.preventDefault(); zoomLevel=Math.min(ZOOM_MAX,+(zoomLevel+ZOOM_STEP).toFixed(1)); applyZoom(); }
   if(e.key==="-"){              e.preventDefault(); zoomLevel=Math.max(ZOOM_MIN,+(zoomLevel-ZOOM_STEP).toFixed(1)); applyZoom(); }
   if(e.key==="0"){              e.preventDefault(); zoomLevel=1.0; applyZoom(); }
   if(e.key==="f"||e.key==="F"){ e.preventDefault(); $("btn-fullscreen").click(); }
-  if(e.key==="Escape"&&sheetFullscreen){ exitSheetFullscreen(); }
+  if(e.key==="Escape"&&sheetFullscreen) exitSheetFullscreen();
+  if(e.key==="r"&&sheetFullscreen){ rotateDeg=(rotateDeg+90)%360; if(rotateDeg===270)rotateDeg=-90; applyRotation(); }
 });
 
 
-
-/* ── 마우스 드래그 스크롤 (확대 상태에서) ── */
-(function(){
-  let dragging=false, startX=0, startY=0, scrollX=0, scrollY=0;
-  const getWrap=()=>$("stage-wrap");
-  document.addEventListener("mousedown", e=>{
-    const wrap=getWrap();
-    if(!wrap||zoomLevel<=1.0) return;
-    if(e.target.closest(".tool-btn,.modal-veil,.drawer,.room-topbar,#room-tab-bar")) return;
-    if(state.tool) return; // 그리기 도구 사용 중엔 드래그 안 함
-    dragging=true;
-    startX=e.clientX; startY=e.clientY;
-    scrollX=wrap.scrollLeft; scrollY=wrap.scrollTop;
-    wrap.style.cursor="grabbing";
-    e.preventDefault();
-  });
-  document.addEventListener("mousemove", e=>{
-    if(!dragging) return;
-    const wrap=getWrap(); if(!wrap) return;
-    wrap.scrollLeft = scrollX-(e.clientX-startX);
-    wrap.scrollTop  = scrollY-(e.clientY-startY);
-  });
-  document.addEventListener("mouseup", ()=>{
-    if(!dragging) return;
-    dragging=false;
-    const wrap=getWrap();
-    if(wrap) wrap.style.cursor = zoomLevel>1.0?"grab":"";
-  });
-})();
-
-/* ── 악보 가로 보기 (악보 이미지 90도 회전) ── */
-let isRotated = false;
-$("btn-rotate").onclick = ()=>{
-  isRotated = !isRotated;
-  const stage = $("stage");
-  if(!stage) return;
-
-  if(isRotated){
-    // 악보 이미지를 90도 회전해서 가로로 크게 보기
-    stage.querySelectorAll(".pane img").forEach(img=>{
-      img.style.transformOrigin = "center center";
-      img.style.transform = "rotate(90deg)";
-      // 회전 후 크기: 높이↔너비 교환
-      img.style.maxWidth  = "none";
-      img.style.maxHeight = "none";
-      img.style.width     = (stage.clientHeight * 0.95) + "px";
-      img.style.height    = "auto";
-    });
-    // stage-wrap 스크롤 가능하게
-    const wrap = $("stage-wrap");
-    if(wrap){ wrap.style.overflow="auto"; wrap.style.cursor="grab"; }
-    $("btn-rotate").textContent = "⟳ 세로";
-    $("btn-rotate").classList.add("on");
-    toast("악보 가로 보기 — 드래그로 이동 가능");
-  } else {
-    // 원래대로
-    stage.querySelectorAll(".pane img").forEach(img=>{
-      img.style.transform = "";
-      img.style.transformOrigin = "";
-      img.style.width = "";
-      img.style.height = "";
-      img.style.maxWidth = "";
-      img.style.maxHeight = "";
-    });
-    const wrap = $("stage-wrap");
-    if(wrap){ wrap.style.overflow="hidden"; wrap.style.cursor=""; }
-    $("btn-rotate").textContent = "⟳ 가로";
-    $("btn-rotate").classList.remove("on");
-    toast("세로 보기로 돌아왔어요");
-  }
-};
 
 function instrKey(){
   const song=state.songs[state.songIdx];
