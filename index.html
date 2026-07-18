@@ -672,7 +672,7 @@ textarea.field{resize:vertical;min-height:100px;line-height:1.6}
   <div id="rtab-sheet" style="flex:1;display:flex;flex-direction:column;min-height:0">
     <div class="note-bar hidden" id="note-bar"></div>
     <div class="song-info-bar hidden" id="song-info-bar"></div>
-    <div class="stage-wrap">
+    <div class="stage-wrap" id="stage-wrap">
     <div class="stage" id="stage"></div>
     <div class="memo-panel" id="memo-panel">
       <div class="memo-panel-head">
@@ -2305,107 +2305,162 @@ $("btn-timer-next").onclick=()=>{
 };
 
 /* ═══════════════════════════════════════════════════
-   악보 확대 / 축소 / 전체화면 (리더)
+   악보 확대 / 축소 / 전체화면
 ═══════════════════════════════════════════════════ */
 let zoomLevel = 1.0;
-const ZOOM_STEP = 0.15;
+const ZOOM_STEP = 0.2;
 const ZOOM_MIN  = 0.5;
-const ZOOM_MAX  = 3.0;
+const ZOOM_MAX  = 4.0;
+let sheetFullscreen = false;
 
+/* ── 확대 적용 ── */
 function applyZoom(){
+  const wrap = $("stage-wrap");
   const stage = $("stage");
-  if(!stage) return;
-  if(zoomLevel === 1.0){
+  if(!wrap || !stage) return;
+
+  if(zoomLevel <= 1.0){
+    // 기본: 화면에 꽉 맞게
+    wrap.style.overflow  = "hidden";
     stage.style.overflow = "hidden";
     stage.querySelectorAll("img").forEach(img=>{
-      img.style.width = ""; img.style.height = ""; img.style.maxWidth = ""; img.style.maxHeight = "";
+      img.style.cssText = "";
     });
   } else {
-    stage.style.overflow = "auto";
+    // 확대: 스크롤 가능하게
+    wrap.style.overflow  = "auto";
+    stage.style.overflow = "visible";
+    stage.style.minWidth = "100%";
     stage.querySelectorAll("img").forEach(img=>{
       img.style.maxWidth  = "none";
       img.style.maxHeight = "none";
       img.style.width     = "auto";
-      img.style.height    = (zoomLevel * 100) + "dvh";
+      img.style.height    = Math.round(zoomLevel * window.innerHeight * 0.92) + "px";
     });
   }
+
   $("btn-zoom-reset").textContent = Math.round(zoomLevel*100)+"%";
   $("btn-zoom-reset").classList.toggle("on", zoomLevel !== 1.0);
+
   // 캔버스 재계산
-  document.querySelectorAll(".pane").forEach(pane=>{
-    const img = pane.querySelector("img");
-    const cv  = pane.querySelector("canvas");
-    if(img && cv && img.complete && img.naturalWidth) fitCv(cv, img);
+  requestAnimationFrame(()=>{
+    document.querySelectorAll(".pane").forEach(pane=>{
+      const img = pane.querySelector("img");
+      const cv  = pane.querySelector("canvas");
+      if(img && cv && img.complete && img.naturalWidth) fitCv(cv, img);
+    });
   });
 }
 
 $("btn-zoom-in").onclick = ()=>{
-  zoomLevel = Math.min(ZOOM_MAX, +(zoomLevel + ZOOM_STEP).toFixed(2));
+  zoomLevel = Math.min(ZOOM_MAX, +(zoomLevel + ZOOM_STEP).toFixed(1));
   applyZoom();
 };
 $("btn-zoom-out").onclick = ()=>{
-  zoomLevel = Math.max(ZOOM_MIN, +(zoomLevel - ZOOM_STEP).toFixed(2));
+  zoomLevel = Math.max(ZOOM_MIN, +(zoomLevel - ZOOM_STEP).toFixed(1));
   applyZoom();
 };
 $("btn-zoom-reset").onclick = ()=>{
   zoomLevel = 1.0;
   applyZoom();
-  toast("원래 크기로 돌아왔어요");
+  toast("원래 크기");
 };
 
-// 핀치 줌 (터치)
+/* ── 핀치 줌 (터치) ── */
 (function(){
-  let initDist = null, initZoom = 1.0;
+  let initDist=null, initZoom=1.0;
   document.addEventListener("touchstart", e=>{
     if(e.touches.length===2 && state.room){
-      initDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+      initDist = Math.hypot(
+        e.touches[0].clientX-e.touches[1].clientX,
+        e.touches[0].clientY-e.touches[1].clientY
+      );
       initZoom = zoomLevel;
     }
-  }, {passive:true});
+  },{passive:true});
   document.addEventListener("touchmove", e=>{
-    if(e.touches.length===2 && initDist && state.room){
-      const dist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
-      zoomLevel = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, +(initZoom * dist / initDist).toFixed(2)));
-      applyZoom();
-    }
-  }, {passive:true});
-  document.addEventListener("touchend", ()=>{ initDist=null; }, {passive:true});
+    if(e.touches.length!==2||!initDist||!state.room) return;
+    const dist=Math.hypot(
+      e.touches[0].clientX-e.touches[1].clientX,
+      e.touches[0].clientY-e.touches[1].clientY
+    );
+    zoomLevel = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, +(initZoom*dist/initDist).toFixed(2)));
+    applyZoom();
+  },{passive:true});
+  document.addEventListener("touchend", ()=>{ initDist=null; },{passive:true});
 })();
 
-// 전체화면
-$("btn-fullscreen").onclick = ()=>{
-  const el = $("screen-room");
-  if(!document.fullscreenElement){
-    (el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen).call(el)
-      .then(()=>{ $("btn-fullscreen").textContent="✕ 전체화면 끄기"; $("btn-fullscreen").classList.add("on"); })
-      .catch(()=>toast("전체화면을 지원하지 않는 환경이에요"));
-  } else {
-    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-    $("btn-fullscreen").textContent="⛶ 전체화면"; $("btn-fullscreen").classList.remove("on");
+/* ── 악보 전용 전체화면 ── */
+function enterSheetFullscreen(){
+  sheetFullscreen = true;
+  $("btn-fullscreen").textContent = "✕ 나가기";
+  $("btn-fullscreen").classList.add("on");
+  // 상단바·탭바·도구바 전부 숨기기
+  ["room-topbar","room-tab-bar","room-bottom"].forEach(id=>{
+    const el=$(id); if(el) el.style.display="none";
+  });
+  // stage-wrap 전체 화면 차지
+  const wrap=$("stage-wrap");
+  wrap.style.position = "fixed";
+  wrap.style.inset    = "0";
+  wrap.style.zIndex   = "100";
+  wrap.style.background = "#000";
+  // 전체화면 나가기 버튼 따로 띄우기
+  let exitBtn = document.getElementById("fs-exit-btn");
+  if(!exitBtn){
+    exitBtn = document.createElement("button");
+    exitBtn.id = "fs-exit-btn";
+    exitBtn.textContent = "✕";
+    exitBtn.style.cssText = "position:fixed;top:12px;right:12px;z-index:200;background:rgba(0,0,0,.55);color:#fff;border:1.5px solid rgba(255,255,255,.3);border-radius:99px;padding:8px 16px;font-size:16px;font-weight:700;cursor:pointer";
+    exitBtn.onclick = exitSheetFullscreen;
+    document.body.appendChild(exitBtn);
   }
-};
-document.addEventListener("fullscreenchange", ()=>{
-  if(!document.fullscreenElement){
-    $("btn-fullscreen").textContent="⛶ 전체화면"; $("btn-fullscreen").classList.remove("on");
-  }
-});
+  exitBtn.style.display = "block";
+  applyZoom();
+}
 
-// 방 나갈 때 줌 초기화
+function exitSheetFullscreen(){
+  sheetFullscreen = false;
+  $("btn-fullscreen").textContent = "⛶ 전체화면";
+  $("btn-fullscreen").classList.remove("on");
+  ["room-topbar","room-tab-bar","room-bottom"].forEach(id=>{
+    const el=$(id); if(el) el.style.display="";
+  });
+  const wrap=$("stage-wrap");
+  wrap.style.position = "";
+  wrap.style.inset    = "";
+  wrap.style.zIndex   = "";
+  wrap.style.background = "";
+  const exitBtn = document.getElementById("fs-exit-btn");
+  if(exitBtn) exitBtn.style.display = "none";
+  zoomLevel = 1.0;
+  applyZoom();
+}
+
+$("btn-fullscreen").onclick = ()=>{
+  if(sheetFullscreen) exitSheetFullscreen();
+  else enterSheetFullscreen();
+};
+
+// 방 나갈 때 초기화
 const _origBtnBack = $("btn-back").onclick;
 $("btn-back").onclick = ()=>{
+  if(sheetFullscreen) exitSheetFullscreen();
   zoomLevel = 1.0;
   if(_origBtnBack) _origBtnBack();
 };
 
-// 키보드 단축키 (+ / -)
+// 키보드 단축키
 document.addEventListener("keydown", e=>{
   if(!state.room || e.target?.tagName==="INPUT" || e.target?.tagName==="TEXTAREA") return;
   if(document.querySelector(".modal-veil.show")) return;
-  if(e.key==="+" || e.key==="="){ e.preventDefault(); zoomLevel=Math.min(ZOOM_MAX,+(zoomLevel+ZOOM_STEP).toFixed(2)); applyZoom(); }
-  if(e.key==="-"){               e.preventDefault(); zoomLevel=Math.max(ZOOM_MIN,+(zoomLevel-ZOOM_STEP).toFixed(2)); applyZoom(); }
-  if(e.key==="0"){               e.preventDefault(); zoomLevel=1.0; applyZoom(); }
-  if(e.key==="F11"||e.key==="f"){ e.preventDefault(); $("btn-fullscreen").click(); }
+  if(e.key==="+"||e.key==="="){ e.preventDefault(); zoomLevel=Math.min(ZOOM_MAX,+(zoomLevel+ZOOM_STEP).toFixed(1)); applyZoom(); }
+  if(e.key==="-"){              e.preventDefault(); zoomLevel=Math.max(ZOOM_MIN,+(zoomLevel-ZOOM_STEP).toFixed(1)); applyZoom(); }
+  if(e.key==="0"){              e.preventDefault(); zoomLevel=1.0; applyZoom(); }
+  if(e.key==="f"||e.key==="F"){ e.preventDefault(); $("btn-fullscreen").click(); }
+  if(e.key==="Escape"&&sheetFullscreen){ exitSheetFullscreen(); }
 });
+
 
 
 function instrKey(){
